@@ -157,13 +157,13 @@ export class TerminalSession {
   }
 
   async click(x: number, y: number, button: "left" | "middle" | "right" = "left"): Promise<void> {
-    // Full click: press then release
-    await this.write(this.encodeMouseEvent({ type: "press", button, x, y }));
-    await this.write(this.encodeMouseEvent({ type: "release", button, x, y }));
+    await this.write(this.encodeMouseEvent({ type: "press", button, x, y: y - 1 }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    await this.write(this.encodeMouseEvent({ type: "release", button, x, y: y - 1 }));
   }
 
   async mouseMove(x: number, y: number): Promise<void> {
-    await this.write(this.encodeMouseEvent({ type: "move", button: "left", x, y }));
+    await this.write(this.encodeMouseEvent({ type: "move", button: "left", x, y: y - 1 }));
   }
 
   async drag(from: { x: number; y: number }, to: { x: number; y: number }): Promise<void> {
