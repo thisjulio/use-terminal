@@ -100,7 +100,14 @@ export type SessionInfo = {
   exitCode?: number;
   createdAt: number;
 };
-export type SessionOptions = { cwd?: string; shell?: string; cols?: number; rows?: number };
+export type SessionOptions = {
+  cwd?: string;
+  shell?: string;
+  command?: string;
+  args?: string[];
+  cols?: number;
+  rows?: number;
+};
 export type McpMessage = {
   method: string;
   params?: SessionOptions & {

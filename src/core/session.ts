@@ -25,6 +25,8 @@ export class TerminalSession {
   private proc?: ReturnType<typeof spawnPty>;
   private readonly cwd: string;
   private readonly shell: string;
+  private readonly command?: string;
+  private readonly args: string[];
   private terminalQueryBuffer = "";
   private mouseSgrEnabled = false;
   private mouseModeBuffer = "";
@@ -32,6 +34,8 @@ export class TerminalSession {
   private constructor(options: SessionOptions) {
     this.cwd = options.cwd ?? process.cwd();
     this.shell = options.shell ?? process.env.SHELL ?? "/bin/sh";
+    this.command = options.command;
+    this.args = options.args ?? [];
     this.emulator = new TerminalEmulator(options.cols, options.rows);
   }
 
@@ -42,7 +46,7 @@ export class TerminalSession {
   }
 
   private start(): void {
-    this.proc = spawnPty(this.shell, [], {
+    this.proc = spawnPty(this.command ?? this.shell, this.command ? this.args : [], {
       cwd: this.cwd,
       name: "xterm-256color",
       cols: this.emulator.cols,
@@ -103,7 +107,7 @@ export class TerminalSession {
       status: this.status,
       pid: this.proc?.pid,
       cwd: this.cwd,
-      shell: this.shell,
+      shell: this.command ? `${this.command} ${this.args.join(" ")}` : this.shell,
       cols: this.emulator.cols,
       rows: this.emulator.rows,
       exitCode: this.exitCode,
