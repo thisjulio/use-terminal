@@ -7,14 +7,20 @@
     "start": "bun run index.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "check": "bun run typecheck && bun test",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "check": "bun run lint && bun run typecheck && bun test",
     "prepare": "husky"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.0",
     "@types/bun": "latest",
     "husky": "^9.1.7"
   },
   "peerDependencies": {
     "typescript": "^7"
+  },
+  "dependencies": {
+    "node-pty": "^1.1.0"
   }
 }

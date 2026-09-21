@@ -83,10 +83,22 @@ Se uma funcionalidade não puder ser testada de modo confiável, reduza o escopo
 
 - TypeScript estrito e nomes que descrevam a semântica do terminal.
 - Funções pequenas, dependências justificadas e interfaces focadas.
+- Aplique Clean Code de forma pragmática: nomes revelam intenção, uma função tem uma responsabilidade principal, evite duplicação e mantenha condicionais simples.
+- Use SOLID como heurística, não como ritual: preserve SRP entre domínio e adapters, dependa de interfaces nos limites e prefira composição; não crie abstrações especulativas.
+- Refatore em passos pequenos e comportamentalmente equivalentes, sempre mantendo testes que tornem a mudança observável.
 - Comentários explicam decisões e limitações, não repetem o código.
 - Commits pequenos e com uma intenção.
 - Não reformate arquivos não relacionados.
 - Não adicionar dependências sem verificar licença, manutenção, compatibilidade Bun/Linux e impacto no bundle.
+
+### Referência de decisão
+
+Essas práticas foram alinhadas após pesquisa sobre Clean Code, SOLID e refatoração
+com SearXNG em setembro de 2026. As referências consultadas incluem
+[Refactoring.Guru](https://refactoring.guru/) e o artigo do
+[DigitalOcean sobre SOLID](https://www.digitalocean.com/community/conceptual-articles/s-o-l-i-d-the-first-five-principles-of-object-oriented-design).
+No projeto, isso significa priorizar coesão, baixo acoplamento e código testável,
+sem introduzir camadas que não atendam a uma necessidade concreta.
 
 ## Critérios para revisão
 

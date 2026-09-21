@@ -4,7 +4,7 @@
 
 O **use-terminal** dá a um agente uma sessão de terminal real e programável — não apenas uma chamada isolada de `bash`. A visão é permitir executar comandos, manter processos, responder prompts interativos, operar TUIs, acompanhar saída e inspecionar a tela em snapshots úteis para máquinas.
 
-> **Estado atual:** este repositório está na fase de especificação e discovery. O README descreve a direção do produto e separa claramente o que é alvo do MVP do que já está implementado.
+> **Estado atual:** o núcleo do MVP está implementado em Bun/TypeScript, incluindo sessões persistentes sobre PTY real via `node-pty`, emulador ANSI básico, snapshots e adapters iniciais REST/MCP.
 
 ## Por que não apenas uma bash tool?
 
@@ -114,15 +114,15 @@ Veja o [roadmap completo](./ROADMAP.md).
 
 ## Desenvolvimento
 
-O projeto ainda não possui uma implementação executável. Quando a fundação for criada, o fluxo esperado será:
+O núcleo possui implementação executável. O fluxo de desenvolvimento é:
 
 ```bash
 bun install
 bun test
-bun run lint
+bun run typecheck
 ```
 
-Um quickstart executável será adicionado junto com o primeiro protótipo funcional.
+O backend Linux usa `node-pty` para criar um pseudo-terminal real, com stdin/stdout unificados, eco, sinais e resize. O MVP ainda não é sandbox e o parser VT/ANSI permanece deliberadamente parcial.
 
 ## Referências
 
