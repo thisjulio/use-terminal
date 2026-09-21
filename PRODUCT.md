@@ -2,9 +2,9 @@
 
 ## Visão
 
-**use-terminal** é uma infraestrutura de terminal observável para agentes LLM: não apenas uma função `bash`, mas uma sessão interativa real que preserva estado, representa a tela e permite operar programas de terminal como um usuário.
+**use-terminal** é um terminal completo, observável e programável para agentes LLM: não apenas uma função `bash`, mas uma sessão interativa real sobre PTY que preserva estado, emula o comportamento do terminal e permite operar programas como um usuário.
 
-O produto nasce para coding agents trabalhando em repositórios locais. O núcleo será um pacote npm em Bun/TypeScript, com adapters equivalentes para REST local e MCP stdio. PTY, sessões persistentes e automação de TUI já são abordagens presentes no ecossistema; a diferenciação pretendida está em reuni-las sob um contrato único, observável e orientado a agentes.
+O produto nasce para coding agents trabalhando em repositórios locais. O núcleo é um pacote em Bun/TypeScript, com adapters equivalentes para REST local e MCP stdio. A diferenciação pretendida está em reunir PTY real, emulação VT/ANSI, viewport, scrollback, seleção, clipboard, mouse e automação de TUI sob um contrato único. Cada capacidade deve existir em uma API low-level, fiel aos bytes e eventos, e em uma API high-level, orientada a ações de automação.
 
 > Status: especificação inicial pós-discovery. As capacidades marcadas como MVP são alvo do produto, não uma afirmação de que já estão implementadas.
 
@@ -48,6 +48,7 @@ Para agentes que precisam agir como usuários de um computador, o use-terminal o
 - **Bytes quando necessário, estrutura quando útil:** o agente pode operar em baixo nível ou consumir snapshots ricos.
 - **Composição:** o pacote deve ser útil sem servidor e o servidor deve ser um adapter fino.
 - **Honestidade de segurança:** o MVP é para ambiente confiável e não é sandbox.
+- **Compatibilidade explícita:** “suporte completo” significa uma matriz verificável de recursos VT/ANSI, não uma promessa sem fixtures e testes.
 
 ## Escopo funcional do MVP amplo
 
@@ -61,14 +62,23 @@ Para agentes que precisam agir como usuários de um computador, o use-terminal o
 - Listar, anexar e desanexar sessões.
 - Expor ID estável, status, PID/PGID, cwd, executável, dimensões, timestamps, exit code, último snapshot e metadados.
 
-### Emulação e snapshots
+### Emulação, viewport e snapshots
 
-- Interpretar ANSI/VT com buffer de tela, cursor, cores, atributos, dimensões e scrollback.
+- Interpretar VT/ANSI com buffer de tela, cursor, cores, atributos, dimensões, modos privados, alternate screen e scrollback.
+- Modelar viewport, offset de scrollback, seleção por célula, seleção multilinha e auto-scroll durante arraste.
+- Distinguir scroll local do emulador de eventos de mouse encaminhados a aplicações que habilitam mouse tracking.
+- Preservar estados necessários para bracketed paste, focus events, hyperlinks, clipboard e negociação de recursos.
 - Snapshot textual em modos selecionáveis: linhas visíveis, cursor/dimensões, estilos/células e árvore.
 - Snapshot bruto: JSON com dimensões, células, texto, cursor e atributos.
 - Snapshot semântico: árvore JSON com linhas, regiões e elementos interativos inferidos quando possível.
 - O modelo semântico é heurístico e deve indicar incerteza; não substitui o estado bruto.
-- Mouse e clipboard são parte do alvo do MVP, sem esconder as sequências/limitações do terminal.
+- Mouse e clipboard são operações low-level e high-level; as sequências, negociações e limitações permanecem observáveis.
+
+### APIs low-level e high-level
+
+- Low-level: escrever/ler bytes, enviar sequências VT, teclas codificadas, eventos de mouse, sinais, resize, snapshots brutos, eventos PTY e estado do emulador.
+- High-level: `type`, `pressKey`, `click`, `drag`, `scroll`, `select`, `copy`, `paste`, `waitForText`, `waitForScreenChange` e ações semânticas.
+- REST e MCP devem expor as mesmas operações, schemas, erros e distinção entre low-level e high-level.
 
 ### Operações assíncronas
 
@@ -91,7 +101,7 @@ Para agentes que precisam agir como usuários de um computador, o use-terminal o
 - Eventos devem ter timestamp, session ID, tipo e payload apropriado.
 - A gravação não deve transformar segredo em texto persistido por acidente; o redaction é uma proteção, não uma garantia perfeita.
 
-## Fora do MVP
+## Fora do escopo inicial, mas no objetivo de longo prazo
 
 - Sandbox, container ou VM;
 - limites obrigatórios de CPU, memória, tempo e output;
@@ -100,6 +110,8 @@ Para agentes que precisam agir como usuários de um computador, o use-terminal o
 - interface web humana;
 - execução distribuída;
 - CI Windows/macOS (o núcleo deve ser abstraído para futura portabilidade).
+
+Compatibilidade universal com todos os terminais e TUIs não é presumida: cada recurso deve ser classificado como suportado, parcialmente suportado ou não suportado e coberto por testes.
 
 ## Segurança e limites conhecidos
 
@@ -115,6 +127,8 @@ Não executar código ou comandos não confiáveis com este MVP. Sandbox e limit
 - Capturar snapshots textual, bruto estruturado e semântico.
 - Receber saída incremental sem polling obrigatório.
 - Executar a mesma operação por pacote, REST e MCP.
+- Usar uma API low-level para reproduzir bytes e uma API high-level para automatizar ações semânticas.
+- Selecionar e copiar texto no viewport, navegar no scrollback e encaminhar mouse corretamente quando uma TUI habilitar tracking.
 - Ter testes unitários do emulador, integração PTY, contratos REST/MCP, snapshots determinísticos, TUI real, CI Linux e quickstart executável.
 
 ## Referências e contexto

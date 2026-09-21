@@ -2,10 +2,11 @@ export type SessionStatus = "running" | "exited" | "closed";
 export type SignalName = "SIGINT" | "SIGTERM" | "SIGKILL" | "SIGTSTP" | "SIGHUP";
 export type MouseButton = "left" | "middle" | "right";
 export type MouseEvent = {
-  type: "click" | "move" | "release" | "press";
+  type: "click" | "move" | "release" | "press" | "wheel";
   button?: MouseButton;
   x: number;
   y: number;
+  delta?: number;
   shift?: boolean;
   meta?: boolean;
   ctrl?: boolean;
@@ -69,6 +70,8 @@ export type Snapshot = {
   mode: "text" | "raw" | "semantic";
   cols: number;
   rows: number;
+  viewport?: { offset: number; height: number; totalRows: number };
+  scrollback?: Cell[][];
   cursor: { x: number; y: number; visible: boolean };
   text?: string;
   cells?: Cell[][];

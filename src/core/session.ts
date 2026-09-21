@@ -135,6 +135,17 @@ export class TerminalSession {
   snapshot(mode: Snapshot["mode"] = "text"): Snapshot {
     return this.emulator.snapshot(mode);
   }
+  setViewport(offset: number): Snapshot {
+    this.emulator.setViewport(offset);
+    return this.snapshot("raw");
+  }
+  scrollViewport(delta: number): Snapshot {
+    this.emulator.scrollViewport(delta);
+    return this.snapshot("raw");
+  }
+  isMouseReportingEnabled(): boolean {
+    return this.mouseSgrEnabled;
+  }
   screenshot(options: ScreenshotOptions = {}): string {
     return renderScreenshot(this.snapshot("raw"), "svg", options) as string;
   }
@@ -157,12 +168,13 @@ export class TerminalSession {
     return null;
   }
 
-  private encodeMouseEvent(event: TerminalMouseEvent): string {
+  encodeMouseEvent(event: TerminalMouseEvent): string {
     let code = event.button === "right" ? 2 : event.button === "middle" ? 1 : 0;
     if (event.shift) code |= 4;
     if (event.meta) code |= 8;
     if (event.ctrl) code |= 16;
     if (event.type === "move") code = 35;
+    if (event.type === "wheel") code = event.delta && event.delta < 0 ? 65 : 64;
     // OpenTUI enables all-motion tracking and expects the SGR motion code
     // used by xterm-compatible terminals for an unpressed pointer.
     const x = Math.max(1, Math.min(this.emulator.cols, event.x + 1));
@@ -178,6 +190,18 @@ export class TerminalSession {
 
   async mouseMove(x: number, y: number): Promise<void> {
     await this.write(this.encodeMouseEvent({ type: "move", button: "left", x, y: y - 1 }));
+  }
+
+  async mouseWheel(x: number, y: number, delta: number): Promise<void> {
+    await this.write(this.encodeMouseEvent({ type: "wheel", button: "left", x, y: y - 1, delta }));
+  }
+
+  async mousePress(event: Omit<TerminalMouseEvent, "type">): Promise<void> {
+    await this.write(this.encodeMouseEvent({ ...event, type: "press" }));
+  }
+
+  async mouseRelease(event: Omit<TerminalMouseEvent, "type">): Promise<void> {
+    await this.write(this.encodeMouseEvent({ ...event, type: "release" }));
   }
 
   async drag(from: { x: number; y: number }, to: { x: number; y: number }): Promise<void> {

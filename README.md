@@ -1,10 +1,10 @@
 # use-terminal
 
-> Uma infraestrutura de terminal observável para agentes LLM.
+> Um terminal completo, observável e programável para agentes LLM.
 
-O **use-terminal** dá a um agente uma sessão de terminal real e programável — não apenas uma chamada isolada de `bash`. A visão é permitir executar comandos, manter processos, responder prompts interativos, operar TUIs, acompanhar saída e inspecionar a tela em snapshots úteis para máquinas. Seu diferencial pretendido é unificar essas capacidades em um núcleo aberto e orientado a agentes, com interfaces equivalentes por pacote, REST e MCP; não é uma alegação de que seja o primeiro ou o único projeto nessa área.
+O **use-terminal** dá a um agente uma sessão de terminal real e programável — não apenas uma chamada isolada de `bash`. O objetivo é reproduzir, sobre um PTY real, as capacidades relevantes de um terminal humano: entrada de baixo nível, emulação VT/ANSI, scrollback, viewport, seleção, clipboard, mouse, TUIs e snapshots observáveis. O mesmo núcleo deve oferecer uma API low-level para controle preciso e uma API high-level para automações, expostas de forma equivalente pelo pacote, REST e MCP.
 
-> **Estado atual:** o núcleo do MVP está implementado em Bun/TypeScript, incluindo sessões persistentes sobre PTY real via `node-pty`, emulador ANSI básico, snapshots e adapters iniciais REST/MCP.
+> **Estado atual:** o núcleo executável já possui sessões persistentes sobre PTY real, emulador ANSI básico, snapshots e adapters REST/MCP. A compatibilidade completa com terminais reais, incluindo scrollback, viewport, seleção e todos os modos VT/ANSI, permanece como objetivo em evolução e não deve ser presumida como implementada.
 
 ## Por que não apenas uma bash tool?
 
@@ -31,19 +31,23 @@ O problema de oferecer PTY, sessões persistentes e automação de TUIs para age
 - **Distribuição:** pacote npm programático, com servidor REST localhost e MCP stdio.
 - **Licença planejada:** MIT.
 
-## Capacidades alvo do MVP
+## Capacidades alvo
 
 - PTY real e shell persistente detectado de `$SHELL`;
 - API de baixo nível de PTY e API de alto nível `TerminalSession`;
 - stdin/saída byte-a-byte, teclas especiais, sinais e resize;
 - múltiplas sessões, jobs, attach/detach e exit code;
-- emulador VT/ANSI, buffer, cursor, cores, scrollback e snapshots textuais;
+- emulador VT/ANSI compatível, com buffer, cursor, cores, atributos, modos privados, alternate screen e scrollback;
+- viewport e seleção por célula com auto-scroll, clipboard e distinção entre scroll local e mouse reporting da TUI;
+- suporte progressivo a OSC/DCS, hyperlinks, bracketed paste, focus events, mouse tracking e demais recursos negociados pelo terminal;
 - snapshot bruto JSON de células e snapshot semântico em árvore;
 - streaming incremental por `AsyncIterator`;
 - stream SSE de snapshots textuais, brutos ou semânticos para visualização ao vivo;
 - espera por texto ou mudança de tela;
 - mouse e clipboard;
-- REST local com SSE e MCP stdio, usando schemas TypeScript compartilhados;
+- API low-level para bytes, sequências, eventos, snapshots e controle de PTY;
+- API high-level para `type`, teclas, clique, scroll, seleção, clipboard, espera por texto/mudança e ações semânticas;
+- REST local com SSE e MCP stdio, usando schemas TypeScript compartilhados e paridade entre as duas APIs;
 - logs estruturados com redaction de padrões conhecidos de segredos.
 
 Os snapshots semânticos serão heurísticos. O snapshot bruto permanece a fonte de verdade.
@@ -80,7 +84,7 @@ Consulte [`PRODUCT.md`](./PRODUCT.md) para o contrato conceitual e [`ROADMAP.md`
 
 ### Pacote npm
 
-O pacote será a interface principal para integração programática: baixo nível de PTY para controle preciso e `TerminalSession` para operações de alto nível.
+O pacote é a interface principal para integração programática. A camada low-level preserva bytes e eventos crus; a camada high-level fornece operações de automação sem esconder o snapshot bruto nem as limitações de compatibilidade.
 
 ### REST localhost
 
@@ -127,7 +131,7 @@ bun test
 bun run typecheck
 ```
 
-O backend Linux usa `node-pty` para criar um pseudo-terminal real, com stdin/stdout unificados, eco, sinais e resize. O MVP ainda não é sandbox e o parser VT/ANSI permanece deliberadamente parcial.
+O backend Linux usa PTY real, com stdin/stdout unificados, eco, sinais e resize. O projeto ainda não é sandbox. A compatibilidade do emulador é construída por uma matriz explícita de recursos, fixtures de bytes, processos reais e TUIs reais; não há promessa de equivalência universal sem testes correspondentes.
 
 ### Visualização ao vivo
 
@@ -167,8 +171,10 @@ mesmo PTY; não cria sandbox nem uma janela gráfica separada para o processo.
 
 O viewer headed usa WebSocket bidirecional em `/sessions/:id/ws`: o servidor
 envia um snapshot inicial e eventos de tela, enquanto o navegador envia input,
-mouse e resize no mesmo canal. O endpoint SSE continua disponível para
-integrações somente de leitura.
+mouse, wheel e resize no mesmo canal. O viewer encaminha teclas de controle,
+setas, navegação, funções, modificadores e arraste. A seleção é feita por
+célula diretamente no canvas, com realce visual e cópia via Ctrl/Cmd+C. O
+endpoint SSE continua disponível para integrações somente de leitura.
 
 ## Referências
 

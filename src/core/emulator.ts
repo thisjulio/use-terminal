@@ -18,6 +18,10 @@ const blank = (): Cell => ({
 
 export class TerminalEmulator {
   private cells: Cell[][];
+  private history: Cell[][] = [];
+  private alternateScreen = false;
+  private normalScreen?: { cells: Cell[][]; history: Cell[][]; x: number; y: number };
+  private viewportOffset = 0;
   private readonly listeners = new Set<(snapshot: Snapshot) => void>();
   private x = 0;
   private y = 0;
@@ -49,9 +53,12 @@ export class TerminalEmulator {
   }
 
   private scroll(): void {
-    this.cells.shift();
+    const removed = this.cells.shift()!;
+    if (!this.alternateScreen) this.history.push(removed);
+    if (this.history.length > this.scrollback) this.history.shift();
     this.cells.push(Array.from({ length: this.cols }, blank));
     this.y = this.rows - 1;
+    this.viewportOffset = 0;
   }
 
   private put(char: string): void {
@@ -149,14 +156,32 @@ export class TerminalEmulator {
   }
 
   private handleCsi(params: string, code: string): void {
-    // Handle private modes (? prefix) - mostly ignore but track cursor visibility
     if (params.startsWith("?")) {
-      const modeNum = parseInt(params.slice(1), 10);
-      if (modeNum === 25) {
+      const requested = params.slice(1).split(";").map(Number);
+      if (requested.includes(1049) || requested.includes(1047) || requested.includes(47)) {
+        if (code === "h" && !this.alternateScreen) {
+          this.normalScreen = { cells: this.cells, history: this.history, x: this.x, y: this.y };
+          this.cells = this.makeBuffer();
+          this.history = [];
+          this.x = 0;
+          this.y = 0;
+          this.alternateScreen = true;
+          this.viewportOffset = 0;
+        } else if (code === "l" && this.alternateScreen && this.normalScreen) {
+          const normal = this.normalScreen;
+          this.cells = normal.cells;
+          this.history = normal.history;
+          this.x = normal.x;
+          this.y = normal.y;
+          this.normalScreen = undefined;
+          this.alternateScreen = false;
+          this.viewportOffset = 0;
+        }
+      }
+      if (requested.includes(25)) {
         // Show/hide cursor
         this.cursorVisible = code === "h";
       }
-      // Other private modes (bracketed paste ?2004, app cursor keys ?1, cursor blink ?12, etc.) are ignored
       return;
     }
 
@@ -327,10 +352,34 @@ export class TerminalEmulator {
         this.cells[row]![column] = old[row]![column]!;
     this.x = Math.min(this.x, this.cols - 1);
     this.y = Math.min(this.y, this.rows - 1);
+    this.history = this.history
+      .map((row) => {
+        const resized = Array.from({ length: this.cols }, blank);
+        for (let column = 0; column < Math.min(this.cols, row.length); column++) resized[column] = row[column]!;
+        return resized;
+      })
+      .slice(-this.scrollback);
+    this.viewportOffset = 0;
+  }
+
+  setViewport(offset: number): void {
+    const maxOffset = Math.max(0, this.history.length);
+    this.viewportOffset = Math.max(0, Math.min(maxOffset, Math.floor(offset)));
+  }
+
+  scrollViewport(delta: number): void {
+    this.setViewport(this.viewportOffset + Math.trunc(delta));
+  }
+
+  get viewport(): { offset: number; height: number; totalRows: number } {
+    return { offset: this.viewportOffset, height: this.rows, totalRows: this.history.length + this.rows };
   }
 
   snapshot(mode: Snapshot["mode"] = "text"): Snapshot {
-    const text = this.cells
+    const allRows = [...this.history, ...this.cells];
+    const end = allRows.length - this.viewportOffset;
+    const visibleRows = allRows.slice(Math.max(0, end - this.rows), end);
+    const text = visibleRows
       .map((row) =>
         row
           .map((cell) => cell.char)
@@ -342,13 +391,24 @@ export class TerminalEmulator {
     const base = {
       cols: this.cols,
       rows: this.rows,
-      cursor: { x: this.x, y: this.y, visible: this.cursorVisible },
+      cursor: {
+        x: this.x,
+        y: this.y - this.viewportOffset,
+        visible: this.cursorVisible && this.viewportOffset === 0,
+      },
+      viewport: this.viewport,
       colorUsage,
     };
     if (mode === "text") return { mode, ...base, text };
     if (mode === "raw")
-      return { mode, ...base, text, cells: this.cells.map((row) => row.map((cell) => ({ ...cell }))) };
-    const tree = parseSemantic(this.cells, this.cols, this.rows);
+      return {
+        mode,
+        ...base,
+        text,
+        cells: visibleRows.map((row) => row.map((cell) => ({ ...cell }))),
+        scrollback: this.history.map((row) => row.map((cell) => ({ ...cell }))),
+      };
+    const tree = parseSemantic(visibleRows, this.cols, this.rows);
     const actions = suggestActions(tree);
     return { mode, ...base, text, tree: { ...tree, colorUsage }, actions };
   }

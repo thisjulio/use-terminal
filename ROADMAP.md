@@ -1,6 +1,6 @@
 # use-terminal — Roadmap
 
-Este roadmap transforma a visão do `PRODUCT.md` em incrementos verificáveis. A ordem é deliberadamente orientada por risco: provar PTY e modelo de sessão antes de enriquecer a representação da tela e adicionar adapters.
+Este roadmap transforma a visão do `PRODUCT.md` em incrementos verificáveis. O objetivo de longo prazo é um terminal completo sobre PTY real, com APIs low-level e high-level equivalentes por pacote, REST e MCP. “Completo” será medido por uma matriz de compatibilidade VT/ANSI e testes reais, não por uma afirmação ilimitada.
 
 ## Fase 0 — Fundação e contrato
 
@@ -80,7 +80,34 @@ Este roadmap transforma a visão do `PRODUCT.md` em incrementos verificáveis. A
 
 **Saída:** o MVP amplo cobre os principais canais de interação de um terminal humano.
 
-## Fase 6 — Robustez, segurança e distribuição
+## Fase 6 — Emulador terminal completo
+
+**Objetivo:** aproximar o comportamento do emulador ao de um terminal real e tornar a compatibilidade mensurável.
+
+- [ ] Definir matriz de compatibilidade VT/ANSI, OSC, CSI, DCS e modos privados.
+- [ ] Implementar scrollback persistente, viewport, offset e alternate screen.
+- [ ] Implementar seleção por célula/multilinha, auto-scroll durante arraste e clipboard.
+- [ ] Separar scroll local do emulador de mouse reporting encaminhado à TUI.
+- [ ] Suportar progressivamente bracketed paste, focus events, hyperlinks, clipboard e negociações de recursos.
+- [ ] Adicionar fixtures determinísticas por sequência e testes com shells e TUIs reais.
+- [ ] Publicar snapshot de viewport, seleção, scrollback e modos ativos sem perder bytes crus.
+
+**Saída:** o viewer e as APIs conseguem reproduzir os fluxos principais de um terminal humano, com limitações documentadas por recurso.
+
+## Fase 7 — APIs low-level e high-level
+
+**Objetivo:** oferecer controle fiel e automação ergonômica sobre o mesmo núcleo.
+
+- [ ] Definir schemas compartilhados para operações low-level e high-level.
+- [ ] Expor bytes, sequências, eventos, modos, viewport e snapshots pela API low-level.
+- [ ] Expor `type`, teclas, clique, drag, scroll, seleção, clipboard e waits pela API high-level.
+- [ ] Garantir paridade de operações, erros e validações entre pacote, REST e MCP.
+- [ ] Criar testes de contrato e exemplos de automação para cada adapter.
+- [ ] Manter acesso ao snapshot bruto e aos eventos crus em toda operação high-level.
+
+**Saída:** um agente pode escolher fidelidade de terminal ou automação semântica sem trocar de modelo.
+
+## Fase 8 — Robustez, segurança e distribuição
 
 **Objetivo:** preparar uso além de ambientes confiáveis.
 
@@ -94,7 +121,7 @@ Este roadmap transforma a visão do `PRODUCT.md` em incrementos verificáveis. A
 
 **Saída:** base para uso remoto, multiusuário e produção, sem confundir isso com o MVP confiável.
 
-## Definition of Done do MVP amplo
+## Definition of Done do objetivo de terminal completo
 
 - Testes unitários do parser/emulador;
 - testes de integração PTY;
@@ -104,6 +131,9 @@ Este roadmap transforma a visão do `PRODUCT.md` em incrementos verificáveis. A
 - CI Linux verde;
 - quickstart executável;
 - documentação que separa implementado, planejado e limitações.
+- matriz de compatibilidade atualizada, com cada recurso suportado associado a testes;
+- paridade comprovada entre APIs low-level/high-level, pacote, REST e MCP;
+- seleção, scrollback, viewport, mouse reporting e clipboard testados no viewer e no núcleo.
 
 ## Riscos de produto
 
@@ -113,5 +143,7 @@ Este roadmap transforma a visão do `PRODUCT.md` em incrementos verificáveis. A
 | “DOM” do terminal gerar falsa confiança | Snapshot bruto obrigatório, heurísticas com confiança |
 | Paridade REST/MCP divergir | schemas compartilhados + testes de contrato |
 | TUIs dependerem de detalhes não suportados | fixtures reais e matriz explícita de compatibilidade |
+| Seleção e scroll confundirem viewer com TUI | estado explícito de viewport, alternate screen e mouse tracking |
+| API high-level esconder comportamento do terminal | preservar bytes crus, eventos e snapshot bruto em todas as operações |
 | MVP ser usado como sandbox | documentação destacada e bloqueio de claims de segurança |
 | Escopo amplo atrasar validação | liberar o núcleo npm antes dos recursos semânticos |
