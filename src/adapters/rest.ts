@@ -10,11 +10,25 @@ async function handleRequest(request: Request, manager: TerminalManager): Promis
   if (url.pathname === "/sessions" && request.method === "POST")
     return Response.json((await manager.create((await request.json()) as SessionOptions)).info(), { status: 201 });
   if (url.pathname === "/sessions" && request.method === "GET") return Response.json(manager.list());
-  const match = url.pathname.match(/^\/sessions\/([^/]+)(?:\/(snapshot|input|signal|resize|stream|close))?$/);
+  const match = url.pathname.match(
+    /^\/sessions\/([^/]+)(?:\/(snapshot|screenshot|input|signal|resize|stream|close))?$/,
+  );
   if (!match) return new Response("Not found", { status: 404 });
   const session = manager.get(match[1]!);
   if (match[2] === "snapshot")
     return Response.json(session.snapshot((url.searchParams.get("mode") as Snapshot["mode"]) || "text"));
+  if (match[2] === "screenshot") {
+    const format = url.searchParams.get("format") ?? "svg";
+    const options = {
+      cellWidth: Number(url.searchParams.get("cellWidth") ?? 8),
+      cellHeight: Number(url.searchParams.get("cellHeight") ?? 16),
+    };
+    if (format === "svg")
+      return new Response(session.screenshot(options), { headers: { "Content-Type": "image/svg+xml; charset=utf-8" } });
+    if (format === "png")
+      return new Response(session.screenshotBytes("png", options), { headers: { "Content-Type": "image/png" } });
+    return Response.json({ error: "format must be svg or png" }, { status: 400 });
+  }
   if (match[2] === "input" && request.method === "POST") {
     await session.write(await request.text());
     return Response.json({ ok: true });
@@ -38,9 +52,8 @@ async function handleRequest(request: Request, manager: TerminalManager): Promis
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          for await (const event of session.events()) {
+          for await (const event of session.events())
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
-          }
         } finally {
           controller.close();
         }

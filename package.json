@@ -24,6 +24,7 @@
     "typescript": "^7"
   },
   "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@xterm/headless": "^6.0.0",
     "bun-pty": "^0.4.10"
   }

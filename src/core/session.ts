@@ -10,6 +10,7 @@ import type {
   MouseEvent as TerminalMouseEvent,
 } from "../types";
 import { TerminalEmulator } from "./emulator";
+import { renderScreenshot, type ScreenshotFormat, type ScreenshotOptions } from "./screenshot";
 
 const keySequences = { CTRL_C: "\x03", CTRL_D: "\x04", CTRL_Z: "\x1a", ENTER: "\r", TAB: "\t" } as const;
 type Key = keyof typeof keySequences;
@@ -130,6 +131,12 @@ export class TerminalSession {
   }
   snapshot(mode: Snapshot["mode"] = "text"): Snapshot {
     return this.emulator.snapshot(mode);
+  }
+  screenshot(options: ScreenshotOptions = {}): string {
+    return renderScreenshot(this.snapshot("raw"), "svg", options) as string;
+  }
+  screenshotBytes(format: Exclude<ScreenshotFormat, "svg">, options: ScreenshotOptions = {}): Uint8Array {
+    return renderScreenshot(this.snapshot("raw"), format, options) as Uint8Array;
   }
 
   private detectClipboardTool(): string | null {

@@ -3,6 +3,8 @@ export { createRestServer } from "./src/adapters/rest";
 export { TerminalEmulator } from "./src/core/emulator";
 export { TerminalManager } from "./src/core/manager";
 export { TerminalSession } from "./src/core/session";
+export { renderScreenshot, renderScreenshotSvg } from "./src/core/screenshot";
+export type { ScreenshotFormat, ScreenshotOptions } from "./src/core/screenshot";
 export * from "./src/types";
 export * from "./src/core/colors";
 
