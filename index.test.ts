@@ -9,6 +9,17 @@ describe("TerminalEmulator", () => {
     expect(e.snapshot("text").text).toContain("hello\nworld");
     expect(raw.cells?.[0]?.[0]?.fg).toBe("1");
   });
+  test("preserva cores ANSI, RGB, atributos e uso por região", () => {
+    const e = new TerminalEmulator(20, 2);
+    e.feed("\x1b[1;4;38;2;10;20;30;48;5;123mRGB\x1b[0m plain");
+    const raw = e.snapshot("raw");
+    expect(raw.cells?.[0]?.[0]?.foreground).toEqual({ type: "rgb", r: 10, g: 20, b: 30 });
+    expect(raw.cells?.[0]?.[0]?.background).toEqual({ type: "ansi", index: 123 });
+    expect(raw.cells?.[0]?.[0]?.bold).toBe(true);
+    expect(raw.cells?.[0]?.[0]?.underline).toBe(true);
+    expect(raw.colorUsage?.some((entry) => entry.color.type === "rgb" && entry.count >= 3)).toBe(true);
+    expect(e.snapshot("semantic").tree?.colorUsage).toBeDefined();
+  });
   test("move cursor, limpa e redimensiona", () => {
     const e = new TerminalEmulator(5, 2);
     e.feed("abc\x1b[2J");

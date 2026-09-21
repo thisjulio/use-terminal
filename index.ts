@@ -4,6 +4,7 @@ export { TerminalEmulator } from "./src/core/emulator";
 export { TerminalManager } from "./src/core/manager";
 export { TerminalSession } from "./src/core/session";
 export * from "./src/types";
+export * from "./src/core/colors";
 
 export function redact(value: string): string {
   return value.replace(/(password|token|secret|api[_-]?key)(\s*[=:]\s*)[^\s&]+/gi, "$1$2[REDACTED]");

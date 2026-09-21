@@ -10,7 +10,23 @@ export type MouseEvent = {
   meta?: boolean;
   ctrl?: boolean;
 };
-export type Cell = { char: string; fg: string; bg: string; bold: boolean; inverse: boolean };
+export type TerminalColor =
+  | { type: "default" }
+  | { type: "ansi"; index: number }
+  | { type: "rgb"; r: number; g: number; b: number };
+export type Cell = {
+  char: string;
+  fg: string;
+  bg: string;
+  foreground?: TerminalColor;
+  background?: TerminalColor;
+  bold: boolean;
+  inverse: boolean;
+  underline?: boolean;
+  dim?: boolean;
+  italic?: boolean;
+  strike?: boolean;
+};
 export type SemanticRole =
   | "terminal"
   | "line"
@@ -43,6 +59,11 @@ export type SemanticNode = {
   width?: number;
   height?: number;
   actions?: SemanticAction[];
+  colorUsage?: Array<{
+    color: TerminalColor;
+    count: number;
+    regions: Array<{ x: number; y: number; width: number; height: number }>;
+  }>;
 };
 export type Snapshot = {
   mode: "text" | "raw" | "semantic";
@@ -53,6 +74,11 @@ export type Snapshot = {
   cells?: Cell[][];
   tree?: SemanticNode;
   actions?: SemanticAction[];
+  colorUsage?: Array<{
+    color: TerminalColor;
+    count: number;
+    regions: Array<{ x: number; y: number; width: number; height: number }>;
+  }>;
 };
 export type TerminalEvent = {
   id: string;

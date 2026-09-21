@@ -1,7 +1,20 @@
-import type { Cell, Snapshot } from "../types";
+import type { Cell, Snapshot, TerminalColor } from "../types";
 import { parseSemantic, suggestActions } from "./semantic";
 
-const blank = (): Cell => ({ char: " ", fg: "default", bg: "default", bold: false, inverse: false });
+const defaultColor: TerminalColor = { type: "default" };
+const blank = (): Cell => ({
+  char: " ",
+  fg: "default",
+  bg: "default",
+  foreground: defaultColor,
+  background: defaultColor,
+  bold: false,
+  inverse: false,
+  underline: false,
+  dim: false,
+  italic: false,
+  strike: false,
+});
 
 export class TerminalEmulator {
   private cells: Cell[][];
@@ -12,6 +25,12 @@ export class TerminalEmulator {
   private bg = "default";
   private bold = false;
   private inverse = false;
+  private underline = false;
+  private dim = false;
+  private italic = false;
+  private strike = false;
+  private foreground: TerminalColor = defaultColor;
+  private background: TerminalColor = defaultColor;
   private cursorVisible = true;
   private escapeBuffer = "";
   private savedX?: number;
@@ -41,7 +60,19 @@ export class TerminalEmulator {
       this.y++;
     }
     if (this.y >= this.rows) this.scroll();
-    this.cells[this.y]![this.x] = { char, fg: this.fg, bg: this.bg, bold: this.bold, inverse: this.inverse };
+    this.cells[this.y]![this.x] = {
+      char,
+      fg: this.fg,
+      bg: this.bg,
+      foreground: this.foreground,
+      background: this.background,
+      bold: this.bold,
+      inverse: this.inverse,
+      underline: this.underline,
+      dim: this.dim,
+      italic: this.italic,
+      strike: this.strike,
+    };
     this.x++;
   }
 
@@ -218,17 +249,74 @@ export class TerminalEmulator {
   }
 
   private applyStyles(values: number[]): void {
-    for (const value of values) {
+    for (let index = 0; index < values.length; index++) {
+      const value = values[index]!;
       if (value === 0) {
         this.fg = "default";
         this.bg = "default";
+        this.foreground = defaultColor;
+        this.background = defaultColor;
         this.bold = false;
         this.inverse = false;
+        this.underline = false;
+        this.dim = false;
+        this.italic = false;
+        this.strike = false;
       } else if (value === 1) this.bold = true;
+      else if (value === 2) this.dim = true;
+      else if (value === 3) this.italic = true;
+      else if (value === 4) this.underline = true;
       else if (value === 7) this.inverse = true;
-      else if (value >= 30 && value <= 37) this.fg = String(value - 30);
-      else if (value >= 40 && value <= 47) this.bg = String(value - 40);
+      else if (value === 9) this.strike = true;
+      else if (value === 22) {
+        this.bold = false;
+        this.dim = false;
+      } else if (value === 23) this.italic = false;
+      else if (value === 24) this.underline = false;
+      else if (value === 27) this.inverse = false;
+      else if (value === 29) this.strike = false;
+      else if (value === 39) {
+        this.fg = "default";
+        this.foreground = defaultColor;
+      } else if (value === 49) {
+        this.bg = "default";
+        this.background = defaultColor;
+      } else if (value >= 30 && value <= 37) {
+        this.fg = String(value - 30);
+        this.foreground = { type: "ansi", index: value - 30 };
+      } else if (value >= 40 && value <= 47) {
+        this.bg = String(value - 40);
+        this.background = { type: "ansi", index: value - 40 };
+      } else if (value >= 90 && value <= 97) {
+        this.fg = String(value - 90 + 8);
+        this.foreground = { type: "ansi", index: value - 90 + 8 };
+      } else if (value >= 100 && value <= 107) {
+        this.bg = String(value - 100 + 8);
+        this.background = { type: "ansi", index: value - 100 + 8 };
+      } else if (value === 38 || value === 48) {
+        const color = this.parseExtendedColor(values, index);
+        if (color) {
+          if (value === 38) this.foreground = color;
+          else this.background = color;
+          index += color.type === "rgb" ? 4 : 2;
+        }
+      }
     }
+  }
+
+  private parseExtendedColor(values: number[], index: number): TerminalColor | undefined {
+    const mode = values[index + 1];
+    if (mode === 5) {
+      const colorIndex = values[index + 2];
+      return colorIndex === undefined ? undefined : { type: "ansi", index: colorIndex };
+    }
+    if (mode === 2) {
+      const r = values[index + 2];
+      const g = values[index + 3];
+      const b = values[index + 4];
+      return r === undefined || g === undefined || b === undefined ? undefined : { type: "rgb", r, g, b };
+    }
+    return undefined;
   }
 
   resize(cols: number, rows: number): void {
@@ -252,12 +340,47 @@ export class TerminalEmulator {
           .replace(/\s+$/, ""),
       )
       .join("\n");
-    const base = { cols: this.cols, rows: this.rows, cursor: { x: this.x, y: this.y, visible: this.cursorVisible } };
+    const colorUsage = this.collectColorUsage();
+    const base = {
+      cols: this.cols,
+      rows: this.rows,
+      cursor: { x: this.x, y: this.y, visible: this.cursorVisible },
+      colorUsage,
+    };
     if (mode === "text") return { mode, ...base, text };
     if (mode === "raw")
       return { mode, ...base, text, cells: this.cells.map((row) => row.map((cell) => ({ ...cell }))) };
     const tree = parseSemantic(this.cells, this.cols, this.rows);
     const actions = suggestActions(tree);
-    return { mode, ...base, text, tree, actions };
+    return { mode, ...base, text, tree: { ...tree, colorUsage }, actions };
+  }
+
+  private collectColorUsage(): Snapshot["colorUsage"] {
+    const entries = new Map<string, { color: TerminalColor; cells: Array<{ x: number; y: number }> }>();
+    for (let y = 0; y < this.cells.length; y++) {
+      for (let x = 0; x < this.cells[y]!.length; x++) {
+        const cell = this.cells[y]![x]!;
+        for (const color of [cell.foreground ?? defaultColor, cell.background ?? defaultColor]) {
+          const key = JSON.stringify(color);
+          const entry = entries.get(key) ?? { color, cells: [] };
+          if (cell.char !== " " || color.type !== "default") entry.cells.push({ x, y });
+          entries.set(key, entry);
+        }
+      }
+    }
+    return [...entries.values()].map(({ color, cells }) => ({
+      color,
+      count: cells.length,
+      regions: cells.length
+        ? [
+            {
+              x: Math.min(...cells.map((cell) => cell.x)),
+              y: Math.min(...cells.map((cell) => cell.y)),
+              width: Math.max(...cells.map((cell) => cell.x)) - Math.min(...cells.map((cell) => cell.x)) + 1,
+              height: Math.max(...cells.map((cell) => cell.y)) - Math.min(...cells.map((cell) => cell.y)) + 1,
+            },
+          ]
+        : [],
+    }));
   }
 }

@@ -26,6 +26,8 @@ export class TerminalSession {
   private readonly cwd: string;
   private readonly shell: string;
   private terminalQueryBuffer = "";
+  private mouseSgrEnabled = false;
+  private mouseModeBuffer = "";
 
   private constructor(options: SessionOptions) {
     this.cwd = options.cwd ?? process.cwd();
@@ -54,6 +56,8 @@ export class TerminalSession {
       } as Record<string, string>,
     });
     this.proc.onData((data) => {
+      this.mouseModeBuffer = (this.mouseModeBuffer + data).slice(-128);
+      this.mouseSgrEnabled ||= /\x1b\[\?1006h/.test(this.mouseModeBuffer);
       this.emulator.feed(data);
       this.respondToTerminalQueries(data);
       this.emit({ type: "data", data });
@@ -140,19 +144,16 @@ export class TerminalSession {
   }
 
   private encodeMouseEvent(event: TerminalMouseEvent): string {
-    // X11 mouse protocol: coordinates are 1-based, so add 33 (32 + 1)
-    let buttonCode = 0;
-    if (event.button === "right") buttonCode = 2;
-    else if (event.button === "middle") buttonCode = 1;
-
-    let actionCode = 0;
-    if (event.type === "release") actionCode = 3;
-    else if (event.type === "move") actionCode = 32;
-
-    const code = buttonCode | actionCode;
-    const x = Math.min(223, event.x) + 33;
-    const y = Math.min(223, event.y) + 33;
-    return `\x1b[${code};${x};${y}M`;
+    let code = event.button === "right" ? 2 : event.button === "middle" ? 1 : 0;
+    if (event.shift) code |= 4;
+    if (event.meta) code |= 8;
+    if (event.ctrl) code |= 16;
+    if (event.type === "move") code = 35;
+    // OpenTUI enables all-motion tracking and expects the SGR motion code
+    // used by xterm-compatible terminals for an unpressed pointer.
+    const x = Math.max(1, Math.min(this.emulator.cols, event.x + 1));
+    const y = Math.max(1, Math.min(this.emulator.rows, event.y + 1));
+    return `\x1b[<${code};${x};${y}${event.type === "release" ? "m" : "M"}`;
   }
 
   async click(x: number, y: number, button: "left" | "middle" | "right" = "left"): Promise<void> {
