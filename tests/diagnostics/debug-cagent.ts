@@ -11,7 +11,7 @@ await session.write("timeout 5 cagent\n");
 // Esperar
 await new Promise((r) => setTimeout(r, 7000));
 
-let snap = session.snapshot("text");
+const snap = session.snapshot("text");
 console.log("Snapshot completo:");
 console.log("===");
 console.log(snap.text);
@@ -19,7 +19,7 @@ console.log("===");
 
 console.log("\nLinhas não-vazias:");
 snap.text.split("\n").forEach((l, i) => {
-  if (l.trim()) console.log(i + ": " + l);
+  if (l.trim()) console.log(`${i}: ${l}`);
 });
 
 session.close();

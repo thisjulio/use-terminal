@@ -1,5 +1,5 @@
 import { Resvg } from "@resvg/resvg-js";
-import type { Cell, Snapshot, TerminalColor } from "../types";
+import type { Snapshot, TerminalColor } from "../types";
 
 export type ScreenshotFormat = "svg" | "png" | "jpeg";
 export type ScreenshotOptions = {

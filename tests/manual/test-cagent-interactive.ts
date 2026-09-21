@@ -16,9 +16,9 @@ await new Promise((r) => setTimeout(r, 8000));
 let snap = session.snapshot("text");
 let lines = snap.text.split("\n");
 console.log("\n    Cagent abriu. Tela atual:");
-lines.forEach((l) => {
-  if (l.trim()) console.log("    " + l);
-});
+for (const l of lines) {
+  if (l.trim()) console.log(`    ${l}`);
+}
 
 // Agora enviar um prompt para o cagent
 console.log("\n[2] Enviando prompt: 'What is the capital of France?'...");
@@ -30,9 +30,9 @@ await new Promise((r) => setTimeout(r, 10000));
 snap = session.snapshot("text");
 lines = snap.text.split("\n");
 console.log("\n    Resposta do cagent:");
-lines.forEach((l) => {
-  if (l.trim()) console.log("    " + l);
-});
+for (const l of lines) {
+  if (l.trim()) console.log(`    ${l}`);
+}
 
 // Verificar se respondeu
 const screenText = snap.text;

@@ -189,8 +189,6 @@ export class TerminalEmulator {
     } else if (code === "G" || code === "`") {
       // Cursor character absolute
       this.x = Math.max(0, (values[0] || 1) - 1);
-    } else if (code === "H") {
-      // Already handled above
     } else if (code === "J") {
       // Erase in display
       if (values[0] === 0) {

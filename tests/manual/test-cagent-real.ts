@@ -14,12 +14,12 @@ await session.write("cagent 'What is 2+2?'\n");
 console.log("    Aguardando resposta do cagent...");
 await new Promise((r) => setTimeout(r, 15000));
 
-let snap = session.snapshot("text");
+const snap = session.snapshot("text");
 console.log("\n    === SAÍDA DO TERMINAL ===");
-let lines = snap.text.split("\n");
-lines.forEach((l, i) => {
+const lines = snap.text.split("\n");
+lines.forEach((l, _i) => {
   if (l.trim()) {
-    console.log("    " + l);
+    console.log(`    ${l}`);
   }
 });
 console.log("    === FIM DA SAÍDA ===");

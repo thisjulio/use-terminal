@@ -11,7 +11,7 @@ await session.write("python3\n");
 await new Promise((r) => setTimeout(r, 5000));
 
 let snap = session.snapshot("text");
-console.log("\nTela após abrir Python (5s):\n" + snap.text);
+console.log(`\nTela após abrir Python (5s):\n${snap.text}`);
 
 // Verificar se tem prompt
 if (snap.text.includes(">>>")) {
@@ -25,7 +25,7 @@ await session.write("print(123)\n");
 await new Promise((r) => setTimeout(r, 3000));
 
 snap = session.snapshot("text");
-console.log("\nTela após comando:\n" + snap.text);
+console.log(`\nTela após comando:\n${snap.text}`);
 
 if (snap.text.includes("123")) {
   console.log("\n✓✓✓ Python processou o comando! ✓✓✓");

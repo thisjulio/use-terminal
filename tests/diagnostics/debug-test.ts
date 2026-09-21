@@ -14,6 +14,8 @@ const snap = session.snapshot("text");
 console.log("Snapshot text:");
 console.log(JSON.stringify(snap.text));
 console.log("\nLinhas:");
-snap.text.split("\n").forEach((l, i) => console.log(i + " |" + l + "|"));
+for (const [i, l] of snap.text.split("\n").entries()) {
+  console.log(`${i} |${l}|`);
+}
 
 session.close();

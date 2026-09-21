@@ -53,3 +53,64 @@ test("REST expõe health e criação local", async () => {
   expect(await health.json()).toEqual({ ok: true, version: "0.1.0" });
   server.stop();
 });
+
+test("sessão headed expõe viewer e aceita input interativo", async () => {
+  const manager = new TerminalManager();
+  const session = await manager.create({ shell: "/bin/sh", headed: true, cols: 20, rows: 3 });
+  const server = createRestServer(manager, 0);
+  expect(session.info().headed).toBe(true);
+
+  const viewer = await fetch(`http://${server.hostname}:${server.port}/sessions/${session.id}`);
+  expect(viewer.headers.get("content-type")).toContain("text/html");
+  expect(await viewer.text()).toContain("EventSource");
+  const explicitViewer = await fetch(`http://${server.hostname}:${server.port}/sessions/${session.id}/viewer`);
+  expect(explicitViewer.status).toBe(200);
+  expect(await explicitViewer.text()).toContain("EventSource");
+
+  const input = await fetch(`http://${server.hostname}:${server.port}/sessions/${session.id}/input`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify("printf 'headed-ok\\n'\r"),
+  });
+  expect(input.status).toBe(200);
+  await session.waitForText("headed-ok");
+
+  const mouse = await fetch(`http://${server.hostname}:${server.port}/sessions/${session.id}/mouse`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type: "click", button: "left", x: 1, y: 1 }),
+  });
+  expect(mouse.status).toBe(200);
+  session.close();
+  server.stop();
+});
+
+test("viewer inclui fallback de emoji e combina surrogate pairs", async () => {
+  const server = createRestServer(new TerminalManager(), 0);
+  const response = await fetch(`http://${server.hostname}:${server.port}/viewer`);
+  const html = await response.text();
+  expect(html).toContain("Noto Color Emoji");
+  expect(html).toContain("isHighSurrogate");
+  expect(html).toContain("isLowSurrogate");
+  server.stop();
+});
+
+test("stream REST pode enviar frames brutos para renderização visual", async () => {
+  const manager = new TerminalManager();
+  const session = await manager.create({ shell: "/bin/sh", cols: 20, rows: 3 });
+  const server = createRestServer(manager, 0);
+  const response = await fetch(`http://${server.hostname}:${server.port}/sessions/${session.id}/stream?mode=raw`);
+  expect(response.headers.get("content-type")).toContain("text/event-stream");
+  await session.write("printf 'visual-ok\\n'");
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (let attempt = 0; attempt < 20 && !buffer.includes('"mode":"raw"'); attempt++) {
+    const result = await reader.read();
+    buffer += decoder.decode(result.value);
+  }
+  expect(buffer).toContain('"mode":"raw"');
+  expect(buffer).toContain('"cells"');
+  session.close();
+  server.stop();
+});

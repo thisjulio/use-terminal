@@ -11,7 +11,7 @@ await session.write("timeout 5 cagent\n");
 await new Promise((r) => setTimeout(r, 7000));
 
 // Ver snapshot raw
-let snap = session.snapshot("raw");
+const snap = session.snapshot("raw");
 console.log("\nSnapshot raw - cols:", snap.cols, "rows:", snap.rows);
 console.log("Texto:", JSON.stringify(snap.text.substring(0, 500)));
 

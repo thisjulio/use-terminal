@@ -40,6 +40,7 @@ O problema de oferecer PTY, sessões persistentes e automação de TUIs para age
 - emulador VT/ANSI, buffer, cursor, cores, scrollback e snapshots textuais;
 - snapshot bruto JSON de células e snapshot semântico em árvore;
 - streaming incremental por `AsyncIterator`;
+- stream SSE de snapshots textuais, brutos ou semânticos para visualização ao vivo;
 - espera por texto ou mudança de tela;
 - mouse e clipboard;
 - REST local com SSE e MCP stdio, usando schemas TypeScript compartilhados;
@@ -127,6 +128,42 @@ bun run typecheck
 ```
 
 O backend Linux usa `node-pty` para criar um pseudo-terminal real, com stdin/stdout unificados, eco, sinais e resize. O MVP ainda não é sandbox e o parser VT/ANSI permanece deliberadamente parcial.
+
+### Visualização ao vivo
+
+O endpoint de stream pode entregar frames brutos, preservando as células, cores e
+cursor necessários para um frontend Canvas ou SVG:
+
+```text
+GET /sessions/:id/stream?mode=raw
+```
+
+Cada evento SSE `screen` contém um `snapshot` com `mode: "raw"` e pode ser
+renderizado como um novo frame. Para um protótipo simples, o cliente pode
+conectar com `EventSource`; para renderização visual, prefira o snapshot bruto
+em vez de consultar `/screenshot` periodicamente. O stream não grava vídeo nem
+faz throttling: o cliente deve limitar a taxa de pintura se necessário.
+
+### Modo headed
+
+O modo padrão continua headless. Para acompanhar uma sessão no navegador,
+crie-a com `headed: true` e abra:
+
+```text
+GET /sessions/:id
+```
+
+O viewer conecta ao stream bruto, mostra a tela em tempo real e aceita foco de
+teclado, entrada de texto, Enter, Tab, Backspace e cliques no terminal. Para
+uma demonstração com o `cagent`:
+
+```bash
+bun run demo:viewer
+```
+
+O comando inicia uma sessão headed em `127.0.0.1`, abre o navegador e mantém a
+sessão viva até Ctrl-C. O modo headed é uma visualização/controle local do
+mesmo PTY; não cria sandbox nem uma janela gráfica separada para o processo.
 
 ## Referências
 

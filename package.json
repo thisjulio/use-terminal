@@ -10,6 +10,7 @@
     "lint": "biome check .",
     "format": "biome format --write .",
     "check": "bun run lint && bun run typecheck && bun test",
+    "demo:viewer": "bun run scripts/live-cagent-viewer.ts",
     "prepare": "husky",
     "test:manual:cagent": "bun run tests/manual/test-cagent-interactive.ts",
     "test:manual:tui": "bun run tests/manual/test-cagent-tui.ts",

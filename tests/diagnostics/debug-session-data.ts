@@ -1,4 +1,5 @@
 import { TerminalSession } from "../../index";
+
 const session = await TerminalSession.create({ shell: "/bin/bash", cols: 120, rows: 36 });
 const events = session.events();
 const reader = events[Symbol.asyncIterator]();

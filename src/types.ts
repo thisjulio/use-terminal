@@ -92,6 +92,7 @@ export type TerminalEvent = {
 export type SessionInfo = {
   id: string;
   status: SessionStatus;
+  headed: boolean;
   pid?: number;
   cwd: string;
   shell: string;
@@ -101,6 +102,7 @@ export type SessionInfo = {
   createdAt: number;
 };
 export type SessionOptions = {
+  headed?: boolean;
   cwd?: string;
   shell?: string;
   command?: string;

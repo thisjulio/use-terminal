@@ -25,7 +25,7 @@ await new Promise((r) => setTimeout(r, 2000));
 let snap = session.snapshot("text");
 let lines = snap.text.split("\n");
 console.log("    Tela (esperando input):");
-lines.slice(-3).forEach((l) => console.log("    |" + l + "|"));
+for (const l of lines.slice(-3)) console.log(`    |${l}|`);
 
 // Responder automaticamente
 console.log("    -> Respondendo 'Mundo'...");
@@ -35,7 +35,7 @@ await new Promise((r) => setTimeout(r, 2000));
 snap = session.snapshot("text");
 lines = snap.text.split("\n");
 console.log("    Tela depois da resposta:");
-lines.slice(-4).forEach((l) => console.log("    |" + l + "|"));
+for (const l of lines.slice(-4)) console.log(`    |${l}|`);
 
 const screenText = snap.text;
 if (screenText.includes("Olá, Mundo!")) {

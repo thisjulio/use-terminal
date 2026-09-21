@@ -13,7 +13,7 @@ console.log("\n[2] Verificando se python está rodando...");
 await session.write("ps aux | grep python\n");
 await new Promise((r) => setTimeout(r, 2000));
 
-let snap = session.snapshot("text");
-console.log("\nProcessos:\n" + snap.text);
+const snap = session.snapshot("text");
+console.log(`\nProcessos:\n${snap.text}`);
 
 session.close();

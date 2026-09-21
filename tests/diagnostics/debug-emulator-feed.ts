@@ -16,7 +16,7 @@ snap.text.split("\n").forEach((l, i) => {
   if (l.trim()) console.log(`  ${i}: |${l}|`);
 });
 
-console.log("\nCursor:", em["x"], em["y"]);
+console.log("\nCursor:", em.x, em.y);
 
 // Agora simular entrada do usuário
 em.feed("print(123)\r");

@@ -14,7 +14,7 @@ await new Promise((r) => setTimeout(r, 3000));
 let snap = session.snapshot("text");
 let lines = snap.text.split("\n");
 console.log("    REPL aberto. Tela:");
-lines.slice(-3).forEach((l) => console.log("    " + l));
+for (const l of lines.slice(-3)) console.log(`    ${l}`);
 
 // Enviar comando
 console.log("\n[2] Enviando: print('Hello from automated terminal!')");
@@ -24,7 +24,7 @@ await new Promise((r) => setTimeout(r, 2000));
 snap = session.snapshot("text");
 lines = snap.text.split("\n");
 console.log("    Resposta:");
-lines.slice(-4).forEach((l) => console.log("    " + l));
+for (const l of lines.slice(-4)) console.log(`    ${l}`);
 
 // Outro comando
 console.log("\n[3] Enviando: 2 + 3");
@@ -34,7 +34,7 @@ await new Promise((r) => setTimeout(r, 2000));
 snap = session.snapshot("text");
 lines = snap.text.split("\n");
 console.log("    Resposta:");
-lines.slice(-3).forEach((l) => console.log("    " + l));
+for (const l of lines.slice(-3)) console.log(`    ${l}`);
 
 // Sair
 console.log("\n[4] Saiendo do REPL...");

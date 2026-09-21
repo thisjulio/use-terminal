@@ -28,6 +28,7 @@ export class TerminalSession {
   private readonly shell: string;
   private readonly command?: string;
   private readonly args: string[];
+  private readonly headed: boolean;
   private terminalQueryBuffer = "";
   private mouseSgrEnabled = false;
   private mouseModeBuffer = "";
@@ -37,6 +38,7 @@ export class TerminalSession {
     this.shell = options.shell ?? process.env.SHELL ?? "/bin/sh";
     this.command = options.command;
     this.args = options.args ?? [];
+    this.headed = options.headed ?? false;
     this.emulator = new TerminalEmulator(options.cols, options.rows);
   }
 
@@ -106,6 +108,7 @@ export class TerminalSession {
     return {
       id: this.id,
       status: this.status,
+      headed: this.headed,
       pid: this.proc?.pid,
       cwd: this.cwd,
       shell: this.command ? `${this.command} ${this.args.join(" ")}` : this.shell,
@@ -242,9 +245,14 @@ export class TerminalSession {
     });
   }
 
-  async *events(): AsyncGenerator<TerminalEvent> {
+  async *events(snapshotMode: Snapshot["mode"] = "text"): AsyncGenerator<TerminalEvent> {
     while (this.status !== "closed" && this.status !== "exited") {
-      yield await this.nextEvent(Infinity);
+      const event = await this.nextEvent(Infinity);
+      if (event.type === "screen" && event.snapshot) {
+        yield { ...event, snapshot: this.snapshot(snapshotMode) };
+      } else {
+        yield event;
+      }
     }
   }
   close(): void {
