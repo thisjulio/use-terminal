@@ -165,6 +165,11 @@ O comando inicia uma sessão headed em `127.0.0.1`, abre o navegador e mantém a
 sessão viva até Ctrl-C. O modo headed é uma visualização/controle local do
 mesmo PTY; não cria sandbox nem uma janela gráfica separada para o processo.
 
+O viewer headed usa WebSocket bidirecional em `/sessions/:id/ws`: o servidor
+envia um snapshot inicial e eventos de tela, enquanto o navegador envia input,
+mouse e resize no mesmo canal. O endpoint SSE continua disponível para
+integrações somente de leitura.
+
 ## Referências
 
 - [OpenAI CUA sample app](https://github.com/openai/openai-cua-sample-app)

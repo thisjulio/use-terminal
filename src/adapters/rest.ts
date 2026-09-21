@@ -1,8 +1,43 @@
 import { TerminalManager } from "../core/manager";
-import type { SessionOptions, Snapshot, MouseEvent as TerminalMouseEvent } from "../types";
+import type { SessionOptions, Snapshot, TerminalEvent, MouseEvent as TerminalMouseEvent } from "../types";
 
 export const DEFAULT_VERSION = "0.1.0";
 const DEFAULT_HOST = "127.0.0.1";
+type ViewerSocketData = { sessionId: string; iterator?: AsyncGenerator<TerminalEvent>; closed: boolean };
+
+async function pumpViewer(socket: Bun.ServerWebSocket<ViewerSocketData>, manager: TerminalManager): Promise<void> {
+  const session = manager.get(socket.data.sessionId);
+  socket.send(JSON.stringify({ type: "snapshot", snapshot: session.snapshot("raw") }));
+  const iterator = session.events("raw");
+  socket.data.iterator = iterator;
+  try {
+    for await (const event of iterator) {
+      if (socket.data.closed) break;
+      if (socket.send(JSON.stringify(event)) === 0) break;
+    }
+  } catch {
+    if (!socket.data.closed) socket.close(1011, "viewer stream failed");
+  }
+}
+
+function websocketMessage(session: ReturnType<TerminalManager["get"]>, message: string): Promise<void> {
+  const payload = JSON.parse(message) as
+    | { type: "input"; data: string }
+    | { type: "mouse"; event: TerminalMouseEvent }
+    | { type: "resize"; cols: number; rows: number };
+  if (payload.type === "input") return session.write(payload.data);
+  if (payload.type === "mouse") {
+    if (payload.event.type === "click")
+      return session.click(payload.event.x, payload.event.y, payload.event.button ?? "left");
+    if (payload.event.type === "move") return session.mouseMove(payload.event.x, payload.event.y);
+    return Promise.reject(new Error("mouse supports click and move"));
+  }
+  if (payload.type === "resize") {
+    session.resize(payload.cols, payload.rows);
+    return Promise.resolve();
+  }
+  return Promise.reject(new Error("unsupported viewer message"));
+}
 
 function viewerHtml(): string {
   return `<!doctype html>
@@ -57,38 +92,41 @@ function draw(snapshot) {
     ctx.globalAlpha = 1;
   }
 }
-async function send(path, body) {
-  await fetch("/sessions/" + encodeURIComponent(id) + path, {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify(body)
-  });
+let socket;
+function connect() {
+  socket = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/sessions/" + encodeURIComponent(id) + "/ws");
+  socket.onopen = () => status.textContent = "live";
+  socket.onclose = () => { status.textContent = "reconnecting…"; setTimeout(connect, 500); };
+  socket.onerror = () => { status.textContent = "disconnected"; };
+  socket.onmessage = event => {
+    const value = JSON.parse(event.data);
+    if (value.type === "snapshot" || value.type === "screen") draw(value.snapshot);
+  };
+}
+function send(message) {
+  if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
 }
 canvas.tabIndex = 0;
 canvas.addEventListener("keydown", event => {
-  if (event.key === "Enter") { event.preventDefault(); send("/input", "\\r"); return; }
-  if (event.key === "Backspace") { event.preventDefault(); send("/input", "\\x7f"); return; }
-  if (event.key === "Tab") { event.preventDefault(); send("/input", "\\t"); return; }
+  if (event.key === "Enter") { event.preventDefault(); send({type: "input", data: "\\r"}); return; }
+  if (event.key === "Backspace") { event.preventDefault(); send({type: "input", data: "\\x7f"}); return; }
+  if (event.key === "Tab") { event.preventDefault(); send({type: "input", data: "\\t"}); return; }
   if (event.key.length === 1) {
     event.preventDefault();
-    send("/input", event.key);
+    send({type: "input", data: event.key});
   }
 });
 canvas.addEventListener("click", event => {
   const rect = canvas.getBoundingClientRect();
-  send("/mouse", {
-    type: "click",
-    button: "left",
+  send({type: "mouse", event: {
+    type: "click", button: "left",
     x: Math.floor((event.clientX - rect.left) / cellWidth) + 1,
     y: Math.floor((event.clientY - rect.top) / cellHeight) + 1
-  });
+  }});
 });
 if (!id) { status.textContent = "missing session parameter"; }
 else {
-  const source = new EventSource("/sessions/" + encodeURIComponent(id) + "/stream?mode=raw");
-  source.onopen = () => status.textContent = "live";
-  source.onerror = () => status.textContent = "disconnected";
-  source.onmessage = event => { const value = JSON.parse(event.data); if (value.type === "screen") draw(value.snapshot); };
+  connect();
 }
 </script></body></html>`;
 }
@@ -102,7 +140,7 @@ async function handleRequest(request: Request, manager: TerminalManager): Promis
     return Response.json((await manager.create((await request.json()) as SessionOptions)).info(), { status: 201 });
   if (url.pathname === "/sessions" && request.method === "GET") return Response.json(manager.list());
   const match = url.pathname.match(
-    /^\/sessions\/([^/]+)(?:\/(snapshot|screenshot|input|mouse|signal|resize|stream|close|viewer))?$/,
+    /^\/sessions\/([^/]+)(?:\/(snapshot|screenshot|input|mouse|signal|resize|stream|close|viewer|ws))?$/,
   );
   if (!match) return new Response("Not found", { status: 404 });
   const session = manager.get(match[1]!);
@@ -190,10 +228,39 @@ async function handleRequest(request: Request, manager: TerminalManager): Promis
 }
 
 export function createRestServer(manager = new TerminalManager(), port = 0) {
-  return Bun.serve({
+  let server: Bun.Server<ViewerSocketData>;
+  server = Bun.serve({
     port,
     hostname: DEFAULT_HOST,
+    idleTimeout: 0,
+    websocket: {
+      data: {} as ViewerSocketData,
+      open(socket) {
+        void pumpViewer(socket, manager);
+      },
+      async message(socket, message) {
+        try {
+          await websocketMessage(manager.get(socket.data.sessionId), String(message));
+        } catch {
+          socket.send(JSON.stringify({ type: "error", error: "invalid viewer message" }));
+        }
+      },
+      close(socket) {
+        socket.data.closed = true;
+        void socket.data.iterator?.return(undefined);
+      },
+    },
     fetch: async (request) => {
+      const url = new URL(request.url);
+      const wsMatch = url.pathname.match(/^\/sessions\/([^/]+)\/ws$/);
+      if (wsMatch) {
+        try {
+          if (server.upgrade(request, { data: { sessionId: wsMatch[1]!, closed: false } })) return;
+          return new Response("WebSocket upgrade failed", { status: 400 });
+        } catch (error) {
+          return Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: 404 });
+        }
+      }
       try {
         return await handleRequest(request, manager);
       } catch (error) {
@@ -201,4 +268,5 @@ export function createRestServer(manager = new TerminalManager(), port = 0) {
       }
     },
   });
+  return server;
 }

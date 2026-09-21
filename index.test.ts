@@ -62,10 +62,10 @@ test("sessão headed expõe viewer e aceita input interativo", async () => {
 
   const viewer = await fetch(`http://${server.hostname}:${server.port}/sessions/${session.id}`);
   expect(viewer.headers.get("content-type")).toContain("text/html");
-  expect(await viewer.text()).toContain("EventSource");
+  expect(await viewer.text()).toContain("new WebSocket");
   const explicitViewer = await fetch(`http://${server.hostname}:${server.port}/sessions/${session.id}/viewer`);
   expect(explicitViewer.status).toBe(200);
-  expect(await explicitViewer.text()).toContain("EventSource");
+  expect(await explicitViewer.text()).toContain("new WebSocket");
 
   const input = await fetch(`http://${server.hostname}:${server.port}/sessions/${session.id}/input`, {
     method: "POST",
@@ -81,6 +81,30 @@ test("sessão headed expõe viewer e aceita input interativo", async () => {
     body: JSON.stringify({ type: "click", button: "left", x: 1, y: 1 }),
   });
   expect(mouse.status).toBe(200);
+  session.close();
+  server.stop();
+});
+
+test("viewer headed expõe upgrade WebSocket", async () => {
+  const manager = new TerminalManager();
+  const session = await manager.create({ shell: "/bin/sh", headed: true, cols: 20, rows: 3 });
+  const server = createRestServer(manager, 0);
+  const socket = new WebSocket(`ws://${server.hostname}:${server.port}/sessions/${session.id}/ws`);
+  const message = await new Promise<string>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("WebSocket snapshot timeout")), 2000);
+    socket.addEventListener("message", (event) => {
+      clearTimeout(timer);
+      resolve(String(event.data));
+    });
+    socket.addEventListener("error", () => reject(new Error("WebSocket connection failed")));
+  });
+  expect(JSON.parse(message).type).toBe("snapshot");
+  await new Promise<void>((resolve) => setTimeout(resolve, 25));
+  socket.send(JSON.stringify({ type: "input", data: "printf 'ws-ok\\n'\r" }));
+  for (let attempt = 0; attempt < 20 && !session.snapshot("text").text?.includes("ws-ok"); attempt++)
+    await new Promise<void>((resolve) => setTimeout(resolve, 25));
+  expect(session.snapshot("text").text).toContain("ws-ok");
+  socket.close();
   session.close();
   server.stop();
 });
