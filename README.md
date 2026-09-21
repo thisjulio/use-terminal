@@ -1,8 +1,8 @@
 # use-terminal
 
-> Um terminal completo para agentes LLM.
+> Uma infraestrutura de terminal observável para agentes LLM.
 
-O **use-terminal** dá a um agente uma sessão de terminal real e programável — não apenas uma chamada isolada de `bash`. A visão é permitir executar comandos, manter processos, responder prompts interativos, operar TUIs, acompanhar saída e inspecionar a tela em snapshots úteis para máquinas.
+O **use-terminal** dá a um agente uma sessão de terminal real e programável — não apenas uma chamada isolada de `bash`. A visão é permitir executar comandos, manter processos, responder prompts interativos, operar TUIs, acompanhar saída e inspecionar a tela em snapshots úteis para máquinas. Seu diferencial pretendido é unificar essas capacidades em um núcleo aberto e orientado a agentes, com interfaces equivalentes por pacote, REST e MCP; não é uma alegação de que seja o primeiro ou o único projeto nessa área.
 
 > **Estado atual:** o núcleo do MVP está implementado em Bun/TypeScript, incluindo sessões persistentes sobre PTY real via `node-pty`, emulador ANSI básico, snapshots e adapters iniciais REST/MCP.
 
@@ -18,6 +18,10 @@ Uma chamada de shell costuma ser suficiente para comandos curtos, mas perde cont
 - observar a tela atual em vez de inferir tudo de stdout.
 
 O use-terminal trata o terminal como uma sessão viva, com estado e eventos.
+
+## Posicionamento
+
+O problema de oferecer PTY, sessões persistentes e automação de TUIs para agentes já é explorado por outras ferramentas. O use-terminal busca se diferenciar pela combinação de PTY real, estado observável da tela, snapshots em diferentes níveis de representação e um contrato compartilhado entre pacote, REST e MCP. A camada semântica futura será heurística e deverá preservar o snapshot bruto como fonte de verdade.
 
 ## Direção do produto
 

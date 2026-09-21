@@ -2,9 +2,9 @@
 
 ## Visão
 
-**use-terminal** é um terminal completo para agentes LLM: não apenas uma função `bash`, mas uma sessão interativa real que preserva estado, entende a tela e permite operar programas de terminal como um usuário.
+**use-terminal** é uma infraestrutura de terminal observável para agentes LLM: não apenas uma função `bash`, mas uma sessão interativa real que preserva estado, representa a tela e permite operar programas de terminal como um usuário.
 
-O produto nasce para coding agents trabalhando em repositórios locais. O núcleo será um pacote npm em Bun/TypeScript, com adapters equivalentes para REST local e MCP stdio.
+O produto nasce para coding agents trabalhando em repositórios locais. O núcleo será um pacote npm em Bun/TypeScript, com adapters equivalentes para REST local e MCP stdio. PTY, sessões persistentes e automação de TUI já são abordagens presentes no ecossistema; a diferenciação pretendida está em reuni-las sob um contrato único, observável e orientado a agentes.
 
 > Status: especificação inicial pós-discovery. As capacidades marcadas como MVP são alvo do produto, não uma afirmação de que já estão implementadas.
 
@@ -38,7 +38,7 @@ Uma tool de shell tradicional é inadequada quando o agente precisa:
 
 ## Proposta de valor
 
-Para agentes que precisam agir como usuários de um computador, o use-terminal oferece uma sessão de terminal fiel, observável e programável. Diferente de uma `bash tool`, ele mantém estado de execução, modela a tela e disponibiliza as mesmas operações por pacote, REST e MCP.
+Para agentes que precisam agir como usuários de um computador, o use-terminal oferece uma sessão de terminal fiel, observável e programável. Diferente de uma `bash tool`, ele mantém estado de execução, modela a tela e disponibiliza as mesmas operações por pacote, REST e MCP. A proposta não é reivindicar novidade absoluta, mas reduzir a fragmentação entre essas capacidades e oferecer uma base coerente para agentes.
 
 ## Princípios
 

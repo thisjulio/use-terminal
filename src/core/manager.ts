@@ -19,4 +19,15 @@ export class TerminalManager {
   list(): SessionInfo[] {
     return [...this.sessions.values()].map((session) => session.info());
   }
+
+  close(id: string): void {
+    const session = this.get(id);
+    session.close();
+  }
+
+  remove(id: string): void {
+    const session = this.get(id);
+    session.close();
+    this.sessions.delete(id);
+  }
 }

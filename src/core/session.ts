@@ -1,6 +1,14 @@
+import { execSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { type IPty, spawn as spawnPty } from "node-pty";
-import type { SessionInfo, SessionOptions, SignalName, Snapshot, TerminalEvent } from "../types";
+import { spawn as spawnPty } from "bun-pty";
+import type {
+  SessionInfo,
+  SessionOptions,
+  SignalName,
+  Snapshot,
+  TerminalEvent,
+  MouseEvent as TerminalMouseEvent,
+} from "../types";
 import { TerminalEmulator } from "./emulator";
 
 const keySequences = { CTRL_C: "\x03", CTRL_D: "\x04", CTRL_Z: "\x1a", ENTER: "\r", TAB: "\t" } as const;
@@ -14,9 +22,10 @@ export class TerminalSession {
   private exitCode?: number;
   private eventsQueue: TerminalEvent[] = [];
   private waiters: ((event: TerminalEvent) => void)[] = [];
-  private proc?: IPty;
+  private proc?: ReturnType<typeof spawnPty>;
   private readonly cwd: string;
   private readonly shell: string;
+  private terminalQueryBuffer = "";
 
   private constructor(options: SessionOptions) {
     this.cwd = options.cwd ?? process.cwd();
@@ -36,18 +45,45 @@ export class TerminalSession {
       name: "xterm-256color",
       cols: this.emulator.cols,
       rows: this.emulator.rows,
-      env: process.env,
+      env: {
+        ...process.env,
+        TERM: "xterm-256color",
+        COLORTERM: "truecolor",
+        COLUMNS: String(this.emulator.cols),
+        LINES: String(this.emulator.rows),
+      } as Record<string, string>,
     });
     this.proc.onData((data) => {
       this.emulator.feed(data);
+      this.respondToTerminalQueries(data);
       this.emit({ type: "data", data });
-      this.emit({ type: "screen", snapshot: this.snapshot("text") });
     });
+    this.emulator.onChange(() => this.emit({ type: "screen", snapshot: this.snapshot("text") }));
     this.proc.onExit(({ exitCode }) => {
       this.status = "exited";
       this.exitCode = exitCode;
       this.emit({ type: "exit", exitCode });
     });
+  }
+
+  private respondToTerminalQueries(data: string): void {
+    if (!this.proc) return;
+    this.terminalQueryBuffer += data;
+    const responses: string[] = [];
+    const snapshot = this.snapshot("text");
+    const cursor = `\x1b[${snapshot.cursor.y + 1};${snapshot.cursor.x + 1}R`;
+    if (this.terminalQueryBuffer.includes("\x1b[6n")) responses.push(cursor);
+    if (this.terminalQueryBuffer.includes("\x1b[5n")) responses.push("\x1b[0n");
+    if (this.terminalQueryBuffer.includes("\x1b[c") || this.terminalQueryBuffer.includes("\x1b[0c"))
+      responses.push("\x1b[?1;2c");
+    if (this.terminalQueryBuffer.includes("\x1b[>c")) responses.push("\x1b[>0;276;0c");
+    if (this.terminalQueryBuffer.includes("\x1b[14t"))
+      responses.push(`\x1b[4;${this.emulator.rows * 16};${this.emulator.cols * 8}t`);
+    for (const mode of this.terminalQueryBuffer.matchAll(/\x1b\[\?(\d+)\$p/g)) responses.push(`\x1b[?${mode[1]};1$y`);
+    for (const query of this.terminalQueryBuffer.matchAll(/\x1bP\+q([0-9a-f]+)\x1b\\/g))
+      responses.push(`\x1bP1+r${query[1]}=1b\x1b\\`);
+    this.terminalQueryBuffer = this.terminalQueryBuffer.slice(-128);
+    if (responses.length) this.proc.write(responses.join(""));
   }
 
   private emit(partial: Omit<TerminalEvent, "id" | "sessionId" | "timestamp">): void {
@@ -88,6 +124,89 @@ export class TerminalSession {
     return this.emulator.snapshot(mode);
   }
 
+  private detectClipboardTool(): string | null {
+    const tools = [
+      { name: "xclip", check: "xclip -version" },
+      { name: "xsel", check: "xsel --version" },
+      { name: "wl-copy", check: "wl-copy --version" },
+    ];
+    for (const tool of tools) {
+      try {
+        execSync(tool.check, { stdio: "ignore" });
+        return tool.name;
+      } catch {}
+    }
+    return null;
+  }
+
+  private encodeMouseEvent(event: TerminalMouseEvent): string {
+    // X11 mouse protocol: coordinates are 1-based, so add 33 (32 + 1)
+    let buttonCode = 0;
+    if (event.button === "right") buttonCode = 2;
+    else if (event.button === "middle") buttonCode = 1;
+
+    let actionCode = 0;
+    if (event.type === "release") actionCode = 3;
+    else if (event.type === "move") actionCode = 32;
+
+    const code = buttonCode | actionCode;
+    const x = Math.min(223, event.x) + 33;
+    const y = Math.min(223, event.y) + 33;
+    return `\x1b[${code};${x};${y}M`;
+  }
+
+  async click(x: number, y: number, button: "left" | "middle" | "right" = "left"): Promise<void> {
+    // Full click: press then release
+    await this.write(this.encodeMouseEvent({ type: "press", button, x, y }));
+    await this.write(this.encodeMouseEvent({ type: "release", button, x, y }));
+  }
+
+  async mouseMove(x: number, y: number): Promise<void> {
+    await this.write(this.encodeMouseEvent({ type: "move", button: "left", x, y }));
+  }
+
+  async drag(from: { x: number; y: number }, to: { x: number; y: number }): Promise<void> {
+    // Real drag: press at from, move to to, release at to
+    await this.write(this.encodeMouseEvent({ type: "press", button: "left", x: from.x, y: from.y }));
+    await this.write(this.encodeMouseEvent({ type: "move", button: "left", x: to.x, y: to.y }));
+    await this.write(this.encodeMouseEvent({ type: "release", button: "left", x: to.x, y: to.y }));
+  }
+
+  async copyToClipboard(text: string): Promise<boolean> {
+    const tool = this.detectClipboardTool();
+    if (!tool) return false;
+    try {
+      const proc = Bun.spawn([tool, "-selection", "clipboard"], { stdio: ["pipe", "inherit", "inherit"] });
+      proc.stdin.write(text);
+      proc.stdin.end();
+      await proc.exited;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async pasteFromClipboard(): Promise<void> {
+    const tool = this.detectClipboardTool();
+    if (!tool) return;
+    try {
+      const proc = Bun.spawn([tool, "-selection", "clipboard", "-o"], {
+        stdio: ["inherit", "pipe", "inherit"],
+      });
+      const result = await proc.exited;
+      if (result === 0) {
+        const output = await new Response(proc.stdout).text();
+        if (output) await this.write(output);
+      }
+    } catch {
+      // Clipboard not available
+    }
+  }
+
+  async paste(text: string): Promise<void> {
+    await this.write(text);
+  }
+
   async waitForText(text: string, timeout = 10000): Promise<void> {
     if (this.snapshot("text").text?.includes(text)) return;
     const end = Date.now() + timeout;
@@ -101,19 +220,25 @@ export class TerminalSession {
   private nextEvent(timeout: number): Promise<TerminalEvent> {
     if (this.eventsQueue.length) return Promise.resolve(this.eventsQueue.shift()!);
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error("event timeout")), timeout);
+      const timer = Number.isFinite(timeout)
+        ? setTimeout(() => reject(new Error("event timeout")), timeout)
+        : undefined;
       this.waiters.push((event) => {
-        clearTimeout(timer);
+        if (timer) clearTimeout(timer);
         resolve(event);
       });
     });
   }
 
   async *events(): AsyncGenerator<TerminalEvent> {
-    while (this.status !== "exited" || this.eventsQueue.length) yield await this.nextEvent(60000);
+    while (this.status !== "closed" && this.status !== "exited") {
+      yield await this.nextEvent(Infinity);
+    }
   }
   close(): void {
-    if (this.status === "running") this.proc?.kill("SIGTERM");
-    this.status = "closed";
+    if (this.status !== "closed" && this.status !== "exited") {
+      this.proc?.kill("SIGTERM");
+      this.status = "closed";
+    }
   }
 }

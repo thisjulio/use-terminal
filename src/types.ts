@@ -1,11 +1,48 @@
 export type SessionStatus = "running" | "exited" | "closed";
 export type SignalName = "SIGINT" | "SIGTERM" | "SIGKILL" | "SIGTSTP" | "SIGHUP";
+export type MouseButton = "left" | "middle" | "right";
+export type MouseEvent = {
+  type: "click" | "move" | "release" | "press";
+  button?: MouseButton;
+  x: number;
+  y: number;
+  shift?: boolean;
+  meta?: boolean;
+  ctrl?: boolean;
+};
 export type Cell = { char: string; fg: string; bg: string; bold: boolean; inverse: boolean };
+export type SemanticRole =
+  | "terminal"
+  | "line"
+  | "text"
+  | "prompt"
+  | "input"
+  | "output"
+  | "error"
+  | "menu"
+  | "table"
+  | "header"
+  | "status"
+  | "cursor";
+
+export type SemanticAction = {
+  id: string;
+  label: string;
+  description?: string;
+  input?: string;
+  confidence: number;
+};
+
 export type SemanticNode = {
-  role: "terminal" | "line" | "text";
+  role: SemanticRole;
   text?: string;
   children?: SemanticNode[];
   confidence: number;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  actions?: SemanticAction[];
 };
 export type Snapshot = {
   mode: "text" | "raw" | "semantic";
@@ -15,6 +52,7 @@ export type Snapshot = {
   text?: string;
   cells?: Cell[][];
   tree?: SemanticNode;
+  actions?: SemanticAction[];
 };
 export type TerminalEvent = {
   id: string;
@@ -37,4 +75,11 @@ export type SessionInfo = {
   createdAt: number;
 };
 export type SessionOptions = { cwd?: string; shell?: string; cols?: number; rows?: number };
-export type McpMessage = { method: string; params?: SessionOptions };
+export type McpMessage = {
+  method: string;
+  params?: SessionOptions & {
+    mode?: Snapshot["mode"];
+    input?: string;
+    signal?: SignalName;
+  };
+};
