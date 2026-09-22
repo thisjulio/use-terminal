@@ -269,6 +269,21 @@ export class TerminalSession {
     });
   }
 
+  async collectEvents(maxEvents = 50, timeoutMs = 2000): Promise<TerminalEvent[]> {
+    const collected: TerminalEvent[] = this.eventsQueue.splice(0, maxEvents);
+    const end = Date.now() + timeoutMs;
+    while (collected.length < maxEvents && this.status === "running") {
+      const remaining = end - Date.now();
+      if (remaining <= 0) break;
+      try {
+        collected.push(await this.nextEvent(remaining));
+      } catch {
+        break;
+      }
+    }
+    return collected;
+  }
+
   async *events(snapshotMode: Snapshot["mode"] = "text"): AsyncGenerator<TerminalEvent> {
     while (this.status !== "closed" && this.status !== "exited") {
       const event = await this.nextEvent(Infinity);

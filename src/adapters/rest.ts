@@ -1,5 +1,6 @@
 import { TerminalManager } from "../core/manager";
 import type { SessionOptions, Snapshot, TerminalEvent, MouseEvent as TerminalMouseEvent } from "../types";
+import { buildOpenApiDocument, SWAGGER_HTML } from "./openapi";
 
 export const DEFAULT_VERSION = "0.1.0";
 const DEFAULT_HOST = "127.0.0.1";
@@ -297,13 +298,17 @@ else {
 async function handleRequest(request: Request, manager: TerminalManager): Promise<Response> {
   const url = new URL(request.url);
   if (url.pathname === "/health") return Response.json({ ok: true, version: DEFAULT_VERSION });
+  if (url.pathname === "/docs/openapi.json")
+    return Response.json(buildOpenApiDocument(`${url.origin}/`), { headers: { "Content-Type": "application/json" } });
+  if (url.pathname === "/docs" || url.pathname === "/")
+    return new Response(SWAGGER_HTML, { headers: { "Content-Type": "text/html; charset=utf-8" } });
   if (url.pathname === "/viewer")
     return new Response(viewerHtml(), { headers: { "Content-Type": "text/html; charset=utf-8" } });
   if (url.pathname === "/sessions" && request.method === "POST")
     return Response.json((await manager.create((await request.json()) as SessionOptions)).info(), { status: 201 });
   if (url.pathname === "/sessions" && request.method === "GET") return Response.json(manager.list());
   const match = url.pathname.match(
-    /^\/sessions\/([^/]+)(?:\/(snapshot|screenshot|input|mouse|signal|resize|viewport|stream|close|viewer|ws))?$/,
+    /^\/sessions\/([^/]+)(?:\/(snapshot|screenshot|input|key|type|mouse|drag|viewport|wait|events|signal|resize|clipboard\/copy|clipboard\/paste|stream|close|viewer|ws))?$/,
   );
   if (!match) return new Response("Not found", { status: 404 });
   const session = manager.get(match[1]!);
@@ -332,6 +337,26 @@ async function handleRequest(request: Request, manager: TerminalManager): Promis
     await session.write(input);
     return Response.json({ ok: true });
   }
+  if (match[2] === "drag" && request.method === "POST") {
+    const body = (await request.json()) as { from: { x: number; y: number }; to: { x: number; y: number } };
+    await session.drag(body.from, body.to);
+    return Response.json({ ok: true });
+  }
+  if (match[2] === "key" && request.method === "POST") {
+    const body = (await request.json()) as { key: string };
+    const key = body.key;
+    if (!["ENTER", "TAB", "CTRL_C", "CTRL_D", "CTRL_Z"].includes(key))
+      return Response.json({ error: "key must be ENTER, TAB, CTRL_C, CTRL_D or CTRL_Z" }, { status: 400 });
+    await session.sendKey(key as Parameters<typeof session.sendKey>[0]);
+    return Response.json({ ok: true });
+  }
+  if (match[2] === "type" && request.method === "POST") {
+    const body = (await request.json()) as { text: string; submit?: boolean };
+    if (typeof body.text !== "string") return Response.json({ error: "text is required" }, { status: 400 });
+    await session.write(body.text);
+    if (body.submit) await session.write("\r");
+    return Response.json({ ok: true });
+  }
   if (match[2] === "mouse" && request.method === "POST") {
     const event = (await request.json()) as TerminalMouseEvent;
     if (event.type === "click") await session.click(event.x, event.y, event.button ?? "left");
@@ -358,11 +383,34 @@ async function handleRequest(request: Request, manager: TerminalManager): Promis
     session.resize(body.cols, body.rows);
     return Response.json(session.info());
   }
+  if (match[2] === "clipboard/copy" && request.method === "POST") {
+    const body = (await request.json()) as { text: string };
+    return Response.json({ ok: true, copied: await session.copyToClipboard(body.text ?? "") });
+  }
+  if (match[2] === "clipboard/paste" && request.method === "POST") {
+    await session.pasteFromClipboard();
+    return Response.json({ ok: true, pasted: true });
+  }
   if (match[2] === "viewport" && request.method === "POST") {
     const body = (await request.json()) as { offset?: number; delta?: number };
     if (body.delta !== undefined) session.scrollViewport(body.delta);
     else session.setViewport(body.offset ?? 0);
     return Response.json(session.snapshot("raw"));
+  }
+  if (match[2] === "wait" && request.method === "POST") {
+    const body = (await request.json()) as { text: string; timeoutMs?: number };
+    if (typeof body.text !== "string") return Response.json({ error: "text is required" }, { status: 400 });
+    try {
+      await session.waitForText(body.text, body.timeoutMs ?? 10000);
+      return Response.json({ ok: true, text: body.text });
+    } catch (error) {
+      return Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: 504 });
+    }
+  }
+  if (match[2] === "events" && request.method === "GET") {
+    const maxEvents = Number(url.searchParams.get("maxEvents") ?? 50);
+    const timeoutMs = Number(url.searchParams.get("timeoutMs") ?? 2000);
+    return Response.json({ events: await session.collectEvents(maxEvents, timeoutMs) });
   }
   if (match[2] === "stream" && request.method === "GET") {
     const encoder = new TextEncoder();

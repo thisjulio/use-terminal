@@ -1,4 +1,6 @@
-export { handleMcp } from "./src/adapters/mcp";
+export type { JsonRpcRequest, JsonRpcResponse, McpTool } from "./src/adapters/mcp";
+export { handleMcp, handleMcpMessage, mcpTools, runMcpStdio } from "./src/adapters/mcp";
+export { buildOpenApiDocument, swaggerHtml } from "./src/adapters/openapi";
 export { createRestServer } from "./src/adapters/rest";
 export * from "./src/core/colors";
 export { TerminalEmulator } from "./src/core/emulator";
