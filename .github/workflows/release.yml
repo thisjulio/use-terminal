@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   publish:
@@ -32,7 +33,5 @@ jobs:
       - name: Validate
         run: bun run check
 
-      - name: Publish package
-        run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish package with npm Trusted Publishing
+        run: npm publish --provenance --access public
