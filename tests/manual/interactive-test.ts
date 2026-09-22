@@ -1,52 +1,52 @@
-// Teste interativo: script que lê input do usuário
+// Interactive test: a script that reads user input
 import { TerminalSession } from "../../index";
 
-console.log("=== TESTE INTERATIVO AUTOMATIZADO ===\n");
+console.log("=== AUTOMATED INTERACTIVE TEST ===\n");
 
 const session = await TerminalSession.create({ shell: "/bin/bash", cols: 80, rows: 24 });
 await new Promise((r) => setTimeout(r, 500));
 
-// Criar script interativo
+// Create an interactive script
 await session.write(`cat > /tmp/ask.sh << 'SCRIPT'
 #!/bin/bash
-echo "Qual seu nome?"
-read nome
-echo "Olá, $nome! Bem-vindo."
+echo "What is your name?"
+read name
+echo "Hello, $name! Welcome."
 SCRIPT
 chmod +x /tmp/ask.sh\n`);
 await new Promise((r) => setTimeout(r, 1000));
 
-// Executar script interativo
-console.log("[1] Executando script que pergunta seu nome...");
+// Run the interactive script
+console.log("[1] Running the script that asks for your name...");
 await session.write("/tmp/ask.sh\n");
 await new Promise((r) => setTimeout(r, 2000));
 
-// Verificar estado da tela
+// Inspect the screen state
 let snap = session.snapshot("text");
 let lines = snap.text.split("\n");
-console.log("    Tela (esperando input):");
-for (const l of lines.slice(-3)) console.log(`    |${l}|`);
+console.log("    Screen (waiting for input):");
+for (const line of lines.slice(-3)) console.log(`    |${line}|`);
 
-// Responder automaticamente
-console.log("    -> Respondendo 'Mundo'...");
-await session.write("Mundo\n");
+// Respond automatically
+console.log("    -> Replying with 'World'...");
+await session.write("World\n");
 await new Promise((r) => setTimeout(r, 2000));
 
 snap = session.snapshot("text");
 lines = snap.text.split("\n");
-console.log("    Tela depois da resposta:");
-for (const l of lines.slice(-4)) console.log(`    |${l}|`);
+console.log("    Screen after the reply:");
+for (const line of lines.slice(-4)) console.log(`    |${line}|`);
 
 const screenText = snap.text;
-if (screenText.includes("Olá, Mundo!")) {
-  console.log("\n    ✓✓✓ INTERAÇÃO FUNCIONOU! ✓✓✓");
-  console.log("    O terminal automatizado respondeu a uma pergunta interativa.");
+if (screenText.includes("Hello, World!")) {
+  console.log("\n    ✓✓✓ INTERACTION WORKED! ✓✓✓");
+  console.log("    The automated terminal answered an interactive question.");
 } else {
-  console.log("\n    ✗ Não detectei a resposta esperada");
+  console.log("\n    ✗ Did not detect the expected response");
 }
 
-// Limpar
-session.write("rm -f /tmp/ask.sh\n");
+// Clean up
+await session.write("rm -f /tmp/ask.sh\n");
 await new Promise((r) => setTimeout(r, 500));
 session.close();
-console.log("\n=== FIM ===");
+console.log("\n=== END ===");

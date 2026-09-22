@@ -1,112 +1,109 @@
 # AGENTS.md
 
-Instruções para agentes de código trabalhando no repositório `use-terminal`.
+Instructions for coding agents working in the `use-terminal` repository.
 
-## Contexto do projeto
+## Project context
 
-O use-terminal é uma infraestrutura de terminal interativo para agentes LLM. O produto deve oferecer um PTY real, sessão persistente, emulação VT/ANSI, snapshots da tela e adapters para pacote npm, REST localhost e MCP stdio. Leia primeiro:
+use-terminal is interactive terminal infrastructure for LLM agents. The product should provide a real PTY, persistent sessions, VT/ANSI emulation, screen snapshots, and adapters for an npm package, localhost REST, and MCP stdio. Read these documents first:
 
-1. [`README.md`](./README.md) — visão pública e status;
-2. [`PRODUCT.md`](./PRODUCT.md) — decisões de produto e limites;
-3. [`ROADMAP.md`](./ROADMAP.md) — ordem de entrega.
+1. [`README.md`](./README.md) — public overview and current status;
+2. [`PRODUCT.md`](./PRODUCT.md) — product decisions and boundaries;
+3. [`ROADMAP.md`](./ROADMAP.md) — delivery sequence.
 
-A documentação pode descrever alvos futuros. Não apresente uma capacidade como implementada sem código e teste que a comprovem.
+Documentation may describe future targets. Do not present a capability as implemented without code and tests that prove it.
 
-## Princípios de implementação
+## Implementation principles
 
-- Preserve a separação entre backend PTY, sessão, emulador, snapshots, eventos e adapters.
-- Faça o pacote programático ser o núcleo; REST e MCP devem ser adapters finos.
-- Use schemas TypeScript compartilhados para entradas, saídas, eventos e erros.
-- Preserve bytes crus e metadados suficientes para diagnóstico; representações semânticas são derivadas.
-- Não esconda incerteza de heurísticas da árvore semântica: mantenha o snapshot bruto disponível.
-- Prefira APIs assíncronas e canceláveis para processos longos.
-- Gere IDs de sessão estáveis e mantenha transições de estado explícitas.
-- Evite acoplamento do domínio a HTTP, MCP ou a um framework de agente.
-- O alvo inicial é Linux, mas abstraia pontos que possam mudar em macOS/Windows.
+- Preserve the separation between the PTY backend, session, emulator, snapshots, events, and adapters.
+- Make the programmatic package the core; REST and MCP should remain thin adapters.
+- Use shared TypeScript schemas for inputs, outputs, events, and errors.
+- Preserve raw bytes and enough metadata for diagnosis; semantic representations are derived.
+- Do not hide uncertainty in semantic-tree heuristics: keep the raw snapshot available.
+- Prefer asynchronous, cancellable APIs for long-running processes.
+- Generate stable session IDs and keep state transitions explicit.
+- Keep the domain independent of HTTP, MCP, and agent frameworks.
+- The initial target is Linux, but abstract boundaries that may change on macOS/Windows.
 
-## Segurança
+## Security
 
-O MVP é para ambiente confiável, não é sandbox e pode executar comandos com os privilégios do usuário. Portanto:
+The MVP targets a trusted environment, is not a sandbox, and can execute commands with the user's privileges. Therefore:
 
-- não introduza claims de isolamento sem implementar e testar uma fronteira real;
-- não habilite bind remoto por padrão;
-- mantenha `127.0.0.1`, CORS desligado e ausência de autenticação explicitamente documentados;
-- trate stdin, stdout, logs, snapshots e eventos como possíveis fontes de segredos;
-- aplique redaction antes de persistir ou emitir logs quando apropriado;
-- nunca adicione telemetria, upload ou execução remota silenciosamente;
-- qualquer futura mudança para rede, multi-tenant ou código não confiável exige revisão de segurança.
+- do not introduce isolation claims without implementing and testing a real boundary;
+- do not enable remote binding by default;
+- explicitly document `127.0.0.1`, disabled CORS, and the absence of authentication;
+- treat stdin, stdout, logs, snapshots, and events as possible sources of secrets;
+- apply redaction before persisting or emitting logs when appropriate;
+- never add telemetry, uploads, or remote execution silently;
+- any future change involving networking, multi-tenancy, or untrusted code requires a security review.
 
-## Workflow obrigatório
+## Required workflow
 
-1. Leia os documentos de contexto e localize o item correspondente no roadmap.
-2. Inspecione o código e os testes existentes antes de editar.
-3. Faça uma mudança pequena, com tipos explícitos e erro observável.
-4. Adicione ou atualize testes junto com a mudança.
-5. Atualize documentação/contratos se comportamento público mudar.
-6. Execute os testes relevantes e depois a suíte completa disponível.
-7. Descreva no PR/commit o que mudou, como foi verificado e quais limitações permanecem.
+1. Read the context documents and locate the corresponding roadmap item.
+2. Inspect the existing code and tests before editing.
+3. Make a small change with explicit types and observable errors.
+4. Add or update tests with the change.
+5. Update documentation/contracts if public behavior changes.
+6. Run the relevant tests and then the complete available test suite.
+7. Describe in the PR/commit what changed, how it was verified, and which limitations remain.
 
-## Contratos e compatibilidade
+## Contracts and compatibility
 
-Mudanças em operações públicas devem atualizar, na mesma alteração:
+Changes to public operations must update, in the same change:
 
-- tipos e schemas TypeScript;
-- implementação do pacote;
-- adapter REST;
-- adapter MCP;
-- testes de contrato/paridade;
-- exemplos e documentação.
+- TypeScript types and schemas;
+- package implementation;
+- REST adapter;
+- MCP adapter;
+- contract/parity tests;
+- examples and documentation.
 
-Não crie uma operação em somente um adapter sem registrar explicitamente a exceção no roadmap. Erros devem ter forma estável, mensagem útil e contexto seguro para logs.
+Do not create an operation in only one adapter without explicitly recording the exception in the roadmap. Errors must have a stable shape, a useful message, and safe context for logs.
 
-## PTY e emulador
+## PTY and emulator
 
-- Teste com processos reais e com fixtures determinísticas de bytes.
-- Diferencie bytes recebidos do PTY de mudanças derivadas no estado da tela.
-- Cubra dimensões, cursor, scrollback, cores/atributos, sinais e encerramento.
-- Não confie apenas em testes de `echo`; inclua prompts, entrada sem newline, processos longos e pelo menos uma TUI real.
-- Faça resize e encerramento idempotentes quando possível.
-- Evite bloquear o event loop do Bun durante leitura/escrita.
+- Test with real processes and deterministic byte fixtures.
+- Distinguish bytes received from the PTY from changes derived in the screen state.
+- Cover dimensions, cursor, scrollback, colors/attributes, signals, and shutdown.
+- Do not rely only on `echo` tests; include prompts, input without a newline, long-running processes, and at least one real TUI.
+- Make resize and shutdown idempotent whenever practical.
+- Avoid blocking Bun's event loop during reads/writes.
 
-## Testes mínimos por mudança
+## Minimum tests for every change
 
-- Parser/emulador: testes unitários e snapshots determinísticos.
-- PTY/sessão: teste de integração em Linux com shell real.
-- REST/MCP: testes de contrato e paridade com a API do pacote.
-- Streaming: ordem, backpressure, cancelamento e encerramento.
-- Segurança/logs: redaction e ausência de segredo em casos de teste.
-- Quickstart: deve seguir os comandos documentados em uma instalação limpa.
+- Parser/emulator: unit tests and deterministic snapshots.
+- PTY/session: Linux integration test with a real shell.
+- REST/MCP: contract and parity tests against the package API.
+- Streaming: ordering, backpressure, cancellation, and shutdown.
+- Security/logging: redaction and secret-free test cases.
+- Quickstart: documented commands must work in a clean installation.
 
-Se uma funcionalidade não puder ser testada de modo confiável, reduza o escopo ou registre a limitação; não substitua a verificação por uma promessa.
+If a feature cannot be tested reliably, reduce its scope or record the limitation; do not replace verification with a promise.
 
-## Estilo
+## Style
 
-- TypeScript estrito e nomes que descrevam a semântica do terminal.
-- Funções pequenas, dependências justificadas e interfaces focadas.
-- Aplique Clean Code de forma pragmática: nomes revelam intenção, uma função tem uma responsabilidade principal, evite duplicação e mantenha condicionais simples.
-- Use SOLID como heurística, não como ritual: preserve SRP entre domínio e adapters, dependa de interfaces nos limites e prefira composição; não crie abstrações especulativas.
-- Refatore em passos pequenos e comportamentalmente equivalentes, sempre mantendo testes que tornem a mudança observável.
-- Comentários explicam decisões e limitações, não repetem o código.
-- Commits pequenos e com uma intenção.
-- Não reformate arquivos não relacionados.
-- Não adicionar dependências sem verificar licença, manutenção, compatibilidade Bun/Linux e impacto no bundle.
+- Strict TypeScript and names that describe terminal semantics.
+- Small functions, justified dependencies, and focused interfaces.
+- Apply Clean Code pragmatically: use intention-revealing names, give each function one primary responsibility, avoid duplication, and keep conditionals simple.
+- Use SOLID as a heuristic, not a ritual: preserve SRP between the domain and adapters, depend on interfaces at boundaries, and prefer composition; do not create speculative abstractions.
+- Refactor in small, behavior-preserving steps while keeping tests that make behavior observable.
+- Comments should explain decisions and limitations, not repeat the code.
+- Keep commits small and focused.
+- Do not reformat unrelated files.
+- Do not add dependencies without checking their license, maintenance, Bun/Linux compatibility, and bundle impact.
 
-### Referência de decisão
+### Decision reference
 
-Essas práticas foram alinhadas após pesquisa sobre Clean Code, SOLID e refatoração
-com SearXNG em setembro de 2026. As referências consultadas incluem
-[Refactoring.Guru](https://refactoring.guru/) e o artigo do
-[DigitalOcean sobre SOLID](https://www.digitalocean.com/community/conceptual-articles/s-o-l-i-d-the-first-five-principles-of-object-oriented-design).
-No projeto, isso significa priorizar coesão, baixo acoplamento e código testável,
-sem introduzir camadas que não atendam a uma necessidade concreta.
+These practices were aligned after research on Clean Code, SOLID, and refactoring with SearXNG in September 2026. The consulted references include [Refactoring.Guru](https://refactoring.guru/) and the [DigitalOcean article on SOLID](https://www.digitalocean.com/community/conceptual-articles/s-o-l-i-d-the-first-five-principles-of-object-oriented-design).
 
-## Critérios para revisão
+In this project, that means prioritizing cohesion, low coupling, and testable code without introducing layers that do not address a concrete need.
 
-Uma mudança está pronta quando:
+## Review criteria
 
-- o comportamento está alinhado ao `PRODUCT.md` e à fase do `ROADMAP.md`;
-- a API pública e seus adapters permanecem coerentes;
-- testes reproduzem o caso principal e falhas importantes;
-- logs/snapshots não vazam segredos desnecessariamente;
-- documentação distingue implementado de planejado;
-- comandos de validação passam em CI Linux.
+A change is ready when:
+
+- behavior aligns with `PRODUCT.md` and the relevant `ROADMAP.md` phase;
+- the public API and its adapters remain coherent;
+- tests reproduce the main case and important failures;
+- logs/snapshots do not unnecessarily leak secrets;
+- documentation distinguishes implemented from planned behavior;
+- validation commands pass in Linux CI.

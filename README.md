@@ -1,60 +1,60 @@
 # use-terminal
 
-> Um terminal completo, observável e programável para agentes LLM.
+> A complete, observable, and programmable terminal for LLM agents.
 
-O **use-terminal** dá a um agente uma sessão de terminal real e programável — não apenas uma chamada isolada de `bash`. O objetivo é reproduzir, sobre um PTY real, as capacidades relevantes de um terminal humano: entrada de baixo nível, emulação VT/ANSI, scrollback, viewport, seleção, clipboard, mouse, TUIs e snapshots observáveis. O mesmo núcleo deve oferecer uma API low-level para controle preciso e uma API high-level para automações, expostas de forma equivalente pelo pacote, REST e MCP.
+**use-terminal** gives an agent a real, programmable terminal session—not just an isolated `bash` call. The goal is to reproduce, over a real PTY, the capabilities relevant to a human terminal: low-level input, VT/ANSI emulation, scrollback, viewport, selection, clipboard, mouse, TUIs, and observable snapshots. The same core should provide a low-level API for precise control and a high-level API for automation, exposed consistently through the package, REST, and MCP.
 
-> **Estado atual:** o núcleo executável já possui sessões persistentes sobre PTY real, emulador ANSI básico, snapshots e adapters REST/MCP. A compatibilidade completa com terminais reais, incluindo scrollback, viewport, seleção e todos os modos VT/ANSI, permanece como objetivo em evolução e não deve ser presumida como implementada.
+> **Current status:** the executable core already has persistent sessions over a real PTY, a basic ANSI emulator, snapshots, and REST/MCP adapters. Full compatibility with real terminals, including scrollback, viewport, selection, and all VT/ANSI modes, remains an evolving goal and must not be assumed to be implemented.
 
-## Por que não apenas uma bash tool?
+## Why not just a bash tool?
 
-Uma chamada de shell costuma ser suficiente para comandos curtos, mas perde contexto quando o agente precisa:
+A shell call is usually enough for short commands, but it loses context when an agent needs to:
 
-- manter um shell e processos persistentes;
-- responder `y/n`, menus ou entradas interativas;
-- lidar com PTY, ANSI/VT, cursor, cores e resize;
-- controlar jobs de longa duração;
-- operar TUIs como editores, monitores e instaladores;
-- observar a tela atual em vez de inferir tudo de stdout.
+- keep a shell and processes persistent;
+- answer `y/n` prompts, menus, or interactive input;
+- handle PTY, ANSI/VT, cursor, colors, and resize;
+- control long-running jobs;
+- operate TUIs such as editors, monitors, and installers;
+- observe the current screen instead of inferring everything from stdout.
 
-O use-terminal trata o terminal como uma sessão viva, com estado e eventos.
+use-terminal treats the terminal as a live session with state and events.
 
-## Posicionamento
+## Positioning
 
-O problema de oferecer PTY, sessões persistentes e automação de TUIs para agentes já é explorado por outras ferramentas. O use-terminal busca se diferenciar pela combinação de PTY real, estado observável da tela, snapshots em diferentes níveis de representação e um contrato compartilhado entre pacote, REST e MCP. A camada semântica futura será heurística e deverá preservar o snapshot bruto como fonte de verdade.
+Other tools already explore providing PTYs, persistent sessions, and TUI automation for agents. use-terminal aims to differentiate itself through the combination of a real PTY, observable screen state, snapshots at different representation levels, and a shared contract across the package, REST, and MCP. The future semantic layer will be heuristic and must preserve the raw snapshot as the source of truth.
 
-## Direção do produto
+## Product direction
 
-- **Público inicial:** desenvolvedores de agentes LLM, ferramentas de coding e contribuidores.
-- **Plataforma inicial:** Linux; núcleo abstraído para futura portabilidade.
+- **Initial audience:** LLM agent developers, coding tools, and contributors.
+- **Initial platform:** Linux; the core is abstracted for future portability.
 - **Runtime:** Bun + TypeScript.
-- **Distribuição:** pacote npm programático, com servidor REST localhost e MCP stdio.
-- **Licença planejada:** MIT.
+- **Distribution:** a programmatic npm package with a localhost REST server and MCP stdio.
+- **Planned license:** MIT.
 
-## Capacidades alvo
+## Target capabilities
 
-- PTY real e shell persistente detectado de `$SHELL`;
-- API de baixo nível de PTY e API de alto nível `TerminalSession`;
-- stdin/saída byte-a-byte, teclas especiais, sinais e resize;
-- múltiplas sessões, jobs, attach/detach e exit code;
-- emulador VT/ANSI compatível, com buffer, cursor, cores, atributos, modos privados, alternate screen e scrollback;
-- viewport e seleção por célula com auto-scroll, clipboard e distinção entre scroll local e mouse reporting da TUI;
-- suporte progressivo a OSC/DCS, hyperlinks, bracketed paste, focus events, mouse tracking e demais recursos negociados pelo terminal;
-- snapshot bruto JSON de células e snapshot semântico em árvore;
-- streaming incremental por `AsyncIterator`;
-- stream SSE de snapshots textuais, brutos ou semânticos para visualização ao vivo;
-- espera por texto ou mudança de tela;
-- mouse e clipboard;
-- API low-level para bytes, sequências, eventos, snapshots e controle de PTY;
-- API high-level para `type`, teclas, clique, scroll, seleção, clipboard, espera por texto/mudança e ações semânticas;
-- REST local com SSE e MCP stdio, usando schemas TypeScript compartilhados e paridade entre as duas APIs;
-- logs estruturados com redaction de padrões conhecidos de segredos.
+- A real PTY and a persistent shell detected from `$SHELL`;
+- a low-level PTY API and a high-level `TerminalSession` API;
+- byte-by-byte stdin/output, special keys, signals, and resize;
+- multiple sessions, jobs, attach/detach, and exit codes;
+- a compatible VT/ANSI emulator with buffer, cursor, colors, attributes, private modes, alternate screen, and scrollback;
+- cell-based viewport and selection with auto-scroll, clipboard, and a distinction between local scrolling and TUI mouse reporting;
+- progressive support for OSC/DCS, hyperlinks, bracketed paste, focus events, mouse tracking, and other terminal-negotiated features;
+- a raw JSON snapshot of cells and a tree-based semantic snapshot;
+- incremental streaming through `AsyncIterator`;
+- an SSE stream of textual, raw, or semantic snapshots for live viewing;
+- waiting for text or screen changes;
+- mouse and clipboard;
+- a low-level API for bytes, sequences, events, snapshots, and PTY control;
+- a high-level API for `type`, keys, clicks, scrolling, selection, clipboard, waiting for text/changes, and semantic actions;
+- local REST with SSE and MCP stdio, using shared TypeScript schemas and parity between both APIs;
+- structured logs with redaction of known secret patterns.
 
-Os snapshots semânticos serão heurísticos. O snapshot bruto permanece a fonte de verdade.
+Semantic snapshots will be heuristic. The raw snapshot remains the source of truth.
 
-## Exemplo de API pretendida
+## Intended API example
 
-A API abaixo é ilustrativa e ainda não está disponível:
+The API below is illustrative and is not yet available:
 
 ```ts
 import { TerminalSession } from "use-terminal";
@@ -66,74 +66,68 @@ const terminal = await TerminalSession.create({
   rows: 36,
 });
 
-await terminal.write("printf 'pronto\\n'");
-await terminal.waitForText("pronto");
+await terminal.write("printf 'ready\\n'");
+await terminal.waitForText("ready");
 
 console.log(terminal.snapshot({ mode: "text" }));
 console.log(terminal.snapshot({ mode: "raw" }));
 
 for await (const event of terminal.events()) {
-  // bytes, mudanças de tela ou eventos semânticos
+  // bytes, screen changes, or semantic events
   console.log(event);
 }
 ```
 
-Consulte [`PRODUCT.md`](./PRODUCT.md) para o contrato conceitual e [`ROADMAP.md`](./ROADMAP.md) para a ordem de implementação.
+See [`PRODUCT.md`](./PRODUCT.md) for the conceptual contract and [`ROADMAP.md`](./ROADMAP.md) for the implementation order.
 
-## Interfaces planejadas
+## Planned interfaces
 
-### Pacote npm
+### npm package
 
-O pacote é a interface principal para integração programática. A camada low-level preserva bytes e eventos crus; a camada high-level fornece operações de automação sem esconder o snapshot bruto nem as limitações de compatibilidade.
+The package is the primary interface for programmatic integration. The low-level layer preserves raw bytes and events; the high-level layer provides automation operations without hiding the raw snapshot or compatibility limitations.
 
-### REST localhost
+### Localhost REST
 
-Um servidor iniciado pela CLI deverá oferecer as operações do pacote em `127.0.0.1`, com porta configurável, endpoints request/response, SSE e health/version. CORS ficará desligado por padrão.
+A server started by the CLI should expose the package operations on `127.0.0.1`, with a configurable port, request/response endpoints, SSE, and health/version endpoints. CORS will be disabled by default.
 
 ### MCP stdio
 
-Um servidor MCP stdio deverá expor as mesmas capacidades e schemas do pacote/REST, permitindo que clientes compatíveis usem o terminal sem uma implementação paralela.
+An MCP stdio server should expose the same capabilities and schemas as the package/REST layer, allowing compatible clients to use the terminal without a parallel implementation.
 
-## Segurança e limitações
+## Security and limitations
 
-O MVP assume um **ambiente confiável**:
+The MVP assumes a **trusted environment**:
 
-- não é sandbox;
-- não impõe limites obrigatórios de CPU, memória, tempo, output ou concorrência;
-- processos podem ter os privilégios do usuário que executa o serviço;
-- não exponha o servidor a uma rede sem uma camada de autenticação/isolamento externa;
-- localhost, CORS desligado e ausência de autenticação não equivalem a segurança forte;
-- sandbox, limites, autenticação remota, multi-tenant e execução distribuída ficam para fases posteriores.
+- it is not a sandbox;
+- it does not impose mandatory CPU, memory, time, output, or concurrency limits;
+- processes may have the privileges of the user running the service;
+- do not expose the server to a network without an external authentication/isolation layer;
+- localhost, disabled CORS, and the absence of authentication do not constitute strong security;
+- sandboxing, limits, remote authentication, multi-tenancy, and distributed execution are deferred to later phases.
 
-Logs terão redaction de padrões conhecidos, mas nenhum detector de segredos é perfeito.
+Logs will redact known patterns, but no secret detector is perfect.
 
-### Aviso para operadores
+### Operator warning
 
-O use-terminal é uma ferramenta privilegiada, não um sandbox. Uma sessão pode iniciar
-um shell configurável, escrever bytes diretamente no PTY, enviar sinais, ler a saída
-do processo e interagir com o clipboard. Portanto, qualquer caller que alcance o
-pacote, o servidor REST ou o MCP pode potencialmente executar comandos com os
-privilégios do usuário do processo. Execute-o somente em ambientes confiáveis,
-mantenha REST/MCP em localhost e implemente autenticação, autorização por sessão,
-limites e isolamento antes de expor essas interfaces a terceiros ou à rede.
+use-terminal is a privileged tool, not a sandbox. A session can start a configurable shell, write bytes directly to the PTY, send signals, read process output, and interact with the clipboard. Therefore, any caller that can reach the package, REST server, or MCP can potentially execute commands with the privileges of the process user. Run it only in trusted environments, keep REST/MCP on localhost, and implement authentication, per-session authorization, limits, and isolation before exposing these interfaces to third parties or a network.
 
-## Status e roadmap
+## Status and roadmap
 
-| Área | Status |
+| Area | Status |
 | --- | --- |
-| Discovery e visão do produto | ✅ concluído |
-| Especificação e roadmap | ✅ concluído |
-| Pacote PTY/sessão | 🧭 planejado |
-| Emulador VT/ANSI e snapshots | 🧭 planejado |
-| REST localhost | 🧭 planejado |
-| MCP stdio | 🧭 planejado |
-| Árvore semântica, mouse e clipboard | 🧭 planejado |
+| Discovery and product vision | ✅ complete |
+| Specification and roadmap | ✅ complete |
+| PTY/session package | 🧭 planned |
+| VT/ANSI emulator and snapshots | 🧭 planned |
+| Localhost REST | 🧭 planned |
+| MCP stdio | 🧭 planned |
+| Semantic tree, mouse, and clipboard | 🧭 planned |
 
-Veja o [roadmap completo](./ROADMAP.md).
+See the [complete roadmap](./ROADMAP.md).
 
-## Desenvolvimento
+## Development
 
-O núcleo possui implementação executável. O fluxo de desenvolvimento é:
+The core has an executable implementation. The development workflow is:
 
 ```bash
 bun install
@@ -141,52 +135,37 @@ bun test
 bun run typecheck
 ```
 
-O backend Linux usa PTY real, com stdin/stdout unificados, eco, sinais e resize. O projeto ainda não é sandbox. A compatibilidade do emulador é construída por uma matriz explícita de recursos, fixtures de bytes, processos reais e TUIs reais; não há promessa de equivalência universal sem testes correspondentes.
+The Linux backend uses a real PTY with unified stdin/stdout, echo, signals, and resize. The project is not yet a sandbox. Emulator compatibility is built through an explicit feature matrix, byte fixtures, real processes, and real TUIs; no universal equivalence is promised without corresponding tests.
 
-### Visualização ao vivo
+### Live viewing
 
-O endpoint de stream pode entregar frames brutos, preservando as células, cores e
-cursor necessários para um frontend Canvas ou SVG:
+The stream endpoint can deliver raw frames while preserving the cells, colors, and cursor required by a Canvas or SVG frontend:
 
 ```text
 GET /sessions/:id/stream?mode=raw
 ```
 
-Cada evento SSE `screen` contém um `snapshot` com `mode: "raw"` e pode ser
-renderizado como um novo frame. Para um protótipo simples, o cliente pode
-conectar com `EventSource`; para renderização visual, prefira o snapshot bruto
-em vez de consultar `/screenshot` periodicamente. O stream não grava vídeo nem
-faz throttling: o cliente deve limitar a taxa de pintura se necessário.
+Each `screen` SSE event contains a snapshot with `mode: "raw"` and can be rendered as a new frame. For a simple prototype, the client can connect with `EventSource`; for visual rendering, prefer the raw snapshot instead of polling `/screenshot`. The stream does not record video or throttle output: the client must limit the paint rate if necessary.
 
-### Modo headed
+### Headed mode
 
-O modo padrão continua headless. Para acompanhar uma sessão no navegador,
-crie-a com `headed: true` e abra:
+The default mode remains headless. To follow a session in the browser, create it with `headed: true` and open:
 
 ```text
 GET /sessions/:id
 ```
 
-O viewer conecta ao stream bruto, mostra a tela em tempo real e aceita foco de
-teclado, entrada de texto, Enter, Tab, Backspace e cliques no terminal. Para
-uma demonstração com o `cagent`:
+The viewer connects to the raw stream, displays the screen in real time, and accepts keyboard focus, text input, Enter, Tab, Backspace, and terminal clicks. For a demonstration with `cagent`:
 
 ```bash
 bun run demo:viewer
 ```
 
-O comando inicia uma sessão headed em `127.0.0.1`, abre o navegador e mantém a
-sessão viva até Ctrl-C. O modo headed é uma visualização/controle local do
-mesmo PTY; não cria sandbox nem uma janela gráfica separada para o processo.
+The command starts a headed session on `127.0.0.1`, opens the browser, and keeps the session alive until Ctrl-C. Headed mode is a local view/control surface for the same PTY; it does not create a sandbox or a separate graphical process window.
 
-O viewer headed usa WebSocket bidirecional em `/sessions/:id/ws`: o servidor
-envia um snapshot inicial e eventos de tela, enquanto o navegador envia input,
-mouse, wheel e resize no mesmo canal. O viewer encaminha teclas de controle,
-setas, navegação, funções, modificadores e arraste. A seleção é feita por
-célula diretamente no canvas, com realce visual e cópia via Ctrl/Cmd+C. O
-endpoint SSE continua disponível para integrações somente de leitura.
+The headed viewer uses a bidirectional WebSocket at `/sessions/:id/ws`: the server sends an initial snapshot and screen events, while the browser sends input, mouse events, wheel events, and resize messages over the same channel. The viewer forwards control keys, arrows, navigation keys, function keys, modifiers, and dragging. Selection is made directly by cell on the canvas, with visual highlighting and copying through Ctrl/Cmd+C. The SSE endpoint remains available for read-only integrations.
 
-## Referências
+## References
 
 - [OpenAI CUA sample app](https://github.com/openai/openai-cua-sample-app)
 - [Anthropic tool use cookbook](https://github.com/anthropics/claude-cookbooks/tree/main/tool_use)
@@ -196,6 +175,6 @@ endpoint SSE continua disponível para integrações somente de leitura.
 - [`pty(7)`](https://man7.org/linux/man-pages/man7/pty.7.html)
 - [`tmux(1)`](https://man7.org/linux/man-pages/man1/tmux.1.html)
 
-## Contribuição
+## Contributing
 
-Antes de implementar, leia [`AGENTS.md`](./AGENTS.md). Mudanças de comportamento devem atualizar testes, documentação e o contrato compartilhado quando aplicável.
+Before implementing changes, read [`AGENTS.md`](./AGENTS.md). Behavior changes should update tests, documentation, and the shared contract when applicable.

@@ -2,14 +2,14 @@ import { describe, expect, test } from "bun:test";
 import { createRestServer, handleMcp, redact, TerminalEmulator, TerminalManager, TerminalSession } from "./index";
 
 describe("TerminalEmulator", () => {
-  test("renderiza texto e ANSI em snapshot", () => {
+  test("renders text and ANSI in a snapshot", () => {
     const e = new TerminalEmulator(10, 3);
     e.feed("\x1b[31mhello\x1b[0m\nworld");
     const raw = e.snapshot("raw");
     expect(e.snapshot("text").text).toContain("hello\nworld");
     expect(raw.cells?.[0]?.[0]?.fg).toBe("1");
   });
-  test("preserva cores ANSI, RGB, atributos e uso por região", () => {
+  test("preserves ANSI/RGB colors, attributes, and regional usage", () => {
     const e = new TerminalEmulator(20, 2);
     e.feed("\x1b[1;4;38;2;10;20;30;48;5;123mRGB\x1b[0m plain");
     const raw = e.snapshot("raw");
@@ -20,7 +20,7 @@ describe("TerminalEmulator", () => {
     expect(raw.colorUsage?.some((entry) => entry.color.type === "rgb" && entry.count >= 3)).toBe(true);
     expect(e.snapshot("semantic").tree?.colorUsage).toBeDefined();
   });
-  test("move cursor, limpa e redimensiona", () => {
+  test("moves the cursor, clears, and resizes", () => {
     const e = new TerminalEmulator(5, 2);
     e.feed("abc\x1b[2J");
     e.resize(8, 4);
@@ -28,7 +28,7 @@ describe("TerminalEmulator", () => {
   });
 });
 
-test("PTY real mantém saída, dimensões e sessão interativa", async () => {
+test("real PTY preserves output, dimensions, and interactive session", async () => {
   const s = await TerminalSession.create({ shell: "/bin/sh", cols: 40, rows: 5 });
   await s.write("printf 'pty-ok\\n'");
   await s.waitForText("pty-ok");
@@ -39,7 +39,7 @@ test("PTY real mantém saída, dimensões e sessão interativa", async () => {
   s.close();
 });
 
-test("manager, redaction e MCP compartilham contrato", async () => {
+test("manager, redaction, and MCP share the contract", async () => {
   const m = new TerminalManager();
   const result = await handleMcp({ method: "health" }, m);
   expect(result).toEqual({ ok: true, version: "0.1.0" });
@@ -47,14 +47,14 @@ test("manager, redaction e MCP compartilham contrato", async () => {
   expect(m.list()).toEqual([]);
 });
 
-test("REST expõe health e criação local", async () => {
+test("REST exposes health and local creation", async () => {
   const server = createRestServer(new TerminalManager(), 0);
   const health = await fetch(`http://${server.hostname}:${server.port}/health`);
   expect(await health.json()).toEqual({ ok: true, version: "0.1.0" });
   server.stop();
 });
 
-test("sessão headed expõe viewer e aceita input interativo", async () => {
+test("headed session exposes the viewer and accepts interactive input", async () => {
   const manager = new TerminalManager();
   const session = await manager.create({ shell: "/bin/sh", headed: true, cols: 20, rows: 3 });
   const server = createRestServer(manager, 0);
@@ -85,7 +85,7 @@ test("sessão headed expõe viewer e aceita input interativo", async () => {
   server.stop();
 });
 
-test("viewer headed expõe upgrade WebSocket", async () => {
+test("headed viewer exposes WebSocket upgrade", async () => {
   const manager = new TerminalManager();
   const session = await manager.create({ shell: "/bin/sh", headed: true, cols: 20, rows: 3 });
   const server = createRestServer(manager, 0);
@@ -109,7 +109,7 @@ test("viewer headed expõe upgrade WebSocket", async () => {
   server.stop();
 });
 
-test("viewer inclui fallback de emoji e combina surrogate pairs", async () => {
+test("viewer includes emoji fallback and combines surrogate pairs", async () => {
   const server = createRestServer(new TerminalManager(), 0);
   const response = await fetch(`http://${server.hostname}:${server.port}/viewer`);
   const html = await response.text();
@@ -119,7 +119,7 @@ test("viewer inclui fallback de emoji e combina surrogate pairs", async () => {
   server.stop();
 });
 
-test("stream REST pode enviar frames brutos para renderização visual", async () => {
+test("REST stream can send raw frames for visual rendering", async () => {
   const manager = new TerminalManager();
   const session = await manager.create({ shell: "/bin/sh", cols: 20, rows: 3 });
   const server = createRestServer(manager, 0);

@@ -12,7 +12,7 @@ console.log(`Live viewer: ${url}`);
 try {
   await execFileAsync("xdg-open", [url]);
 } catch {
-  console.log("Não foi possível abrir o navegador automaticamente; abra a URL acima.");
+  console.log("Could not open the browser automatically; open the URL above.");
 }
 await new Promise<void>((resolve) => {
   const stop = () => {

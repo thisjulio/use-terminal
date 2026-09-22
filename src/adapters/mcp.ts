@@ -190,7 +190,7 @@ export async function handleMcpMessage(
       }
     }
     if (method.includes("/") && MCP_TOOL_NAMES.includes(method.replace(/\//g, "_"))) {
-      // Compatibilidade com o contrato legado (method direto, ex.: "sessions/create").
+      // Compatibility with the legacy contract (method direto, ex.: "sessions/create").
       const result = await callTool(method.replace(/\//g, "_"), request.params ?? {}, manager);
       return { jsonrpc: "2.0", id, result: toolResult(result) };
     }
@@ -202,9 +202,9 @@ export async function handleMcpMessage(
 }
 
 /**
- * Compatibilidade com o contrato legado do pacote: `handleMcp({ method, params })`.
- * Mantido para testes existentes e integrações antigas; o caminho recomendado é
- * `runMcpStdio` (JSON-RPC stdio) ou REST.
+ * Compatibility with the package's legacy contract: `handleMcp({ method, params })`.
+ * Kept for existing tests and legacy integrations; the recommended path is
+ * `runMcpStdio` (JSON-RPC stdio) or REST.
  */
 export async function handleMcp(
   message: { method: string; params?: Record<string, unknown> },

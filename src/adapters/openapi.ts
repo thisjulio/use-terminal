@@ -3,9 +3,9 @@ import { COMPONENT_SCHEMAS, ROUTES } from "../contracts";
 import { DEFAULT_VERSION } from "./rest";
 
 /**
- * Gera o documento OpenAPI 3.1 a partir da tabela de rotas em `src/contracts.ts`.
- * O documento é servido em `/docs/openapi.json` e a UI Swagger em `/docs`.
- * Não dependemos de libs externas: o schema JSON é serializado diretamente.
+ * Generates the OpenAPI 3.1 document from the route table in `src/contracts.ts`.
+ * The document is served at `/docs/openapi.json`, with Swagger UI at `/docs`.
+ * No external libraries are required: the JSON schema is serialized directly.
  */
 
 export type OpenApiDocument = Record<string, unknown>;
@@ -76,7 +76,7 @@ export function buildOpenApiDocument(basePath = "/"): OpenApiDocument {
     }
     if (route.streaming)
       responses["200"] = {
-        description: "Fluxo SSE",
+        description: "SSE stream",
         content: { "text/event-stream": { schema: { type: "string" } } },
       };
     operation.responses = responses;
@@ -90,15 +90,15 @@ export function buildOpenApiDocument(basePath = "/"): OpenApiDocument {
       title: "use-terminal REST API",
       version: DEFAULT_VERSION,
       description:
-        "API REST localhost do use-terminal: sessões PTY, snapshots (text/raw/semantic), input low-level (bytes), operações high-level (type/key/mouse/wait), viewport/scrollback, clipboard, sinais, resize, stream SSE, screenshots e viewer. Bind 127.0.0.1, sem autenticação, CORS desligado. Contratos equivalentes disponíveis no MCP stdio (tools com os mesmos nomes e schemas).",
+        "use-terminal localhost REST API: PTY sessions, snapshots (text/raw/semantic), low-level input (bytes), high-level operations (type/key/mouse/wait), viewport/scrollback, clipboard, signals, resize, SSE stream, screenshots, and viewer. Binds to 127.0.0.1, without authentication, with CORS disabled. Equivalent contracts are available through MCP stdio (tools with the same names and schemas).",
     },
     servers: [{ url: `${basePath}` }],
     tags: [
-      { name: "system", description: "Health, documentação e versionamento" },
+      { name: "system", description: "Health, documentation, and versioning" },
       {
         name: "sessions",
         description:
-          "Sessões PTY: criação, metadados, input, mouse, snapshot, viewport, eventos, sinais, clipboard e stream",
+          "PTY sessions: creation, metadata, input, mouse, snapshots, viewport, events, signals, clipboard, and streaming",
       },
     ],
     paths,

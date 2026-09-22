@@ -17,7 +17,7 @@ function mcpExpectedProps(route: RestRoute): string[] {
 function restExpectedProps(route: RestRoute): string[] {
   if (route.requestBody) {
     if (route.requestBody.type === "string") {
-      // REST aceita body string puro; o MCP usa a propriedade correspondente.
+      // REST accepts a plain string body; MCP uses the corresponding property.
       if (route.id === "session_input") return ["data"];
       if (route.id === "session_signal") return ["signal"];
       return [];
@@ -35,8 +35,8 @@ function schemaProperties(schema: JsonSchema | undefined): string[] {
   return Object.keys(schema?.properties ?? {});
 }
 
-describe("Contratos MCP/REST/OpenAPI", () => {
-  test("todas as tools MCP correspondem a uma rota REST documentada", () => {
+describe("MCP/REST/OpenAPI contracts", () => {
+  test("all MCP tools correspond to a documented REST route", () => {
     const routeByTool = new Map(ROUTES.map((route) => [route.mcpTool?.name, route]));
     for (const name of toolNames()) {
       const route = routeByTool.get(name);
@@ -45,15 +45,15 @@ describe("Contratos MCP/REST/OpenAPI", () => {
     }
   });
 
-  test("MCP_TOOL_NAMES coincide com tools/list", () => {
+  test("MCP_TOOL_NAMES matches tools/list", () => {
     expect(toolNames().sort()).toEqual([...MCP_TOOL_NAMES].sort());
   });
 
-  test("todas as tools MCP declaram inputSchema object", () => {
+  test("all MCP tools declare an object inputSchema", () => {
     for (const tool of mcpTools()) expect(tool.inputSchema.type).toBe("object");
   });
 
-  test("schemas MCP são equivalentes aos parâmetros REST (body/query)", () => {
+  test("MCP schemas match REST parameters (body/query)", () => {
     const mismatch: string[] = [];
     for (const route of ROUTES) {
       if (!route.mcpTool) continue;
@@ -65,7 +65,7 @@ describe("Contratos MCP/REST/OpenAPI", () => {
     expect(mismatch).toEqual([]);
   });
 
-  test("OpenAPI contém todas as rotas e schemas compartilhados", () => {
+  test("OpenAPI contains all routes and shared schemas", () => {
     const doc = buildOpenApiDocument("/") as {
       paths: Record<string, Record<string, unknown>>;
       components: { schemas: Record<string, unknown> };
@@ -90,7 +90,7 @@ describe("Contratos MCP/REST/OpenAPI", () => {
     expect(doc.components.schemas.Snapshot).toBeDefined();
   });
 
-  test("handleMcpMessage responde initialize, tools/list e tools/call", async () => {
+  test("handleMcpMessage responds to initialize, tools/list, and tools/call", async () => {
     const manager = new TerminalManager();
     const init = await handleMcpMessage({ jsonrpc: "2.0", id: 1, method: "initialize" }, manager);
     const initResult = init?.result as { protocolVersion: string; serverInfo: { name: string } };
@@ -103,7 +103,7 @@ describe("Contratos MCP/REST/OpenAPI", () => {
     expect(unknown?.error?.code).toBe(-32601);
   });
 
-  test("MCP stdio executa ciclo completo (create → type → wait → snapshot → close)", async () => {
+  test("MCP stdio completes the full cycle (create → type → wait → snapshot → close)", async () => {
     const proc = Bun.spawn(["bun", "src/mcp.ts"], { stdio: ["pipe", "pipe", "inherit"] });
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
@@ -126,9 +126,9 @@ describe("Contratos MCP/REST/OpenAPI", () => {
     const responses = new Map<number, unknown>();
     const deadline = Date.now() + 20000;
     for (;;) {
-      if (Date.now() > deadline) throw new Error("timeout lendo MCP stdio");
+      if (Date.now() > deadline) throw new Error("timeout reading MCP stdio");
       const { done, value } = await reader.read();
-      if (done) throw new Error("stdout do MCP fechou antes de responder");
+      if (done) throw new Error("MCP stdout closed before responding");
       buffer += decoder.decode(value, { stream: true });
       for (;;) {
         const index = buffer.indexOf("\n");
@@ -160,9 +160,9 @@ describe("Contratos MCP/REST/OpenAPI", () => {
     proc.stdin.write(encoder.encode(`${JSON.stringify(action)}\n`));
     const nextDeadline = Date.now() + 20000;
     for (;;) {
-      if (Date.now() > nextDeadline) throw new Error("timeout em sessions_type");
+      if (Date.now() > nextDeadline) throw new Error("timeout in sessions_type");
       const { done, value } = await reader.read();
-      if (done) throw new Error("stdout fechado");
+      if (done) throw new Error("stdout closed");
       buffer += decoder.decode(value, { stream: true });
       const index = buffer.indexOf("\n");
       if (index === -1) continue;
@@ -183,9 +183,9 @@ describe("Contratos MCP/REST/OpenAPI", () => {
     proc.stdin.write(encoder.encode(`${JSON.stringify(wait)}\n`));
     const waitDeadline = Date.now() + 30000;
     for (;;) {
-      if (Date.now() > waitDeadline) throw new Error("timeout em sessions_wait");
+      if (Date.now() > waitDeadline) throw new Error("timeout in sessions_wait");
       const { done, value } = await reader.read();
-      if (done) throw new Error("stdout fechado");
+      if (done) throw new Error("stdout closed");
       buffer += decoder.decode(value, { stream: true });
       const index = buffer.indexOf("\n");
       if (index === -1) continue;
@@ -208,7 +208,7 @@ describe("Contratos MCP/REST/OpenAPI", () => {
     proc.stdin.write(encoder.encode(`${JSON.stringify(close)}\n`));
     const closeDeadline = Date.now() + 20000;
     for (;;) {
-      if (Date.now() > closeDeadline) throw new Error("timeout em sessions_close");
+      if (Date.now() > closeDeadline) throw new Error("timeout in sessions_close");
       const { done, value } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
@@ -224,7 +224,7 @@ describe("Contratos MCP/REST/OpenAPI", () => {
     proc.kill();
   }, 60000);
 
-  test("REST expõe /docs (Swagger UI) e /docs/openapi.json", async () => {
+  test("REST exposes /docs (Swagger UI) and /docs/openapi.json", async () => {
     const server = createRestServer(new TerminalManager(), 0);
     const base = `http://${server.hostname}:${server.port}`;
     const doc = await fetch(`${base}/docs/openapi.json`);
@@ -240,7 +240,7 @@ describe("Contratos MCP/REST/OpenAPI", () => {
     server.stop();
   });
 
-  test("REST high-level: type+Enter, key, wait, events e clipboard", async () => {
+  test("REST high-level: type+Enter, key, wait, events, and clipboard", async () => {
     const manager = new TerminalManager();
     const session = await manager.create({ shell: "/bin/sh", cols: 40, rows: 10 });
     const server = createRestServer(manager, 0);
@@ -302,7 +302,7 @@ describe("Contratos MCP/REST/OpenAPI", () => {
     server.stop();
   }, 30000);
 
-  test("OpenAPI doc coincide com as rotas da tabela", () => {
+  test("OpenAPI document matches the route table", () => {
     const doc = buildOpenApiDocument("/") as { paths: Record<string, Record<string, unknown>> };
     for (const route of ROUTES) {
       const openApiPath = route.path.replaceAll("{id}", "{sessionId}");

@@ -8,12 +8,12 @@ import type {
 } from "./types";
 
 /**
- * Tabela de rotas do adapter REST com schemas JSON compartilhados.
+ * REST adapter route table with shared JSON schemas.
  *
- * Esta tabela é a fonte única de verdade usada para:
- * - documentar as operações do REST (gera o OpenAPI em `src/adapters/openapi.ts`);
- * - definir as tools MCP (input schemas idênticos em `src/adapters/mcp.ts`);
- * - validar paridade REST/MCP nos testes (`tests/contracts.test.ts`).
+ * This table is the single source of truth used to:
+ * - document REST operations (generates OpenAPI in `src/adapters/openapi.ts`);
+ * - define MCP tools (identical input schemas in `src/adapters/mcp.ts`);
+ * - validate REST/MCP parity in tests (`tests/contracts.test.ts`).
  */
 
 export type JsonSchema = {
@@ -101,10 +101,10 @@ export const COMPONENT_SCHEMAS: Record<string, JsonSchema> = {
   SessionOptions: {
     type: "object",
     properties: {
-      headed: { type: "boolean", description: "Abre também o viewer web para esta sessão" },
+      headed: { type: "boolean", description: "Also opens the web viewer for this session" },
       cwd: { type: "string" },
       shell: { type: "string" },
-      command: { type: "string", description: "Programa a executar (padrão: $SHELL)" },
+      command: { type: "string", description: "Program to run (default: $SHELL)" },
       args: { type: "array", items: { type: "string" } },
       cols: { type: "integer", minimum: 1 },
       rows: { type: "integer", minimum: 1 },
@@ -133,7 +133,7 @@ export const COMPONENT_SCHEMAS: Record<string, JsonSchema> = {
       button: { type: "string", enum: ["left", "middle", "right"] },
       x: { type: "integer", minimum: 1 },
       y: { type: "integer", minimum: 1 },
-      delta: { type: "number", description: "Só para wheel; positivo = scroll down" },
+      delta: { type: "number", description: "Only for wheel; positive means scroll down" },
       shift: { type: "boolean" },
       meta: { type: "boolean" },
       ctrl: { type: "boolean" },
@@ -159,7 +159,7 @@ export const COMPONENT_SCHEMAS: Record<string, JsonSchema> = {
       },
       text: { type: "string" },
       cells: { type: "array", items: { type: "array", items: { $ref: "#/components/schemas/Cell" } } },
-      tree: { type: "object", description: "Árvore semântica heurística (presente em mode=semantic)" },
+      tree: { type: "object", description: "Heuristic semantic tree (present in mode=semantic)" },
       actions: {
         type: "array",
         items: {
@@ -194,7 +194,7 @@ export const COMPONENT_SCHEMAS: Record<string, JsonSchema> = {
   KeyName: {
     type: "string",
     enum: ["ENTER", "TAB", "CTRL_C", "CTRL_D", "CTRL_Z"],
-    description: "Teclas especiais suportadas pela API high-level",
+    description: "Special keys supported by the high-level API",
   },
   Error: ERROR_SCHEMA,
 };
@@ -204,8 +204,8 @@ export const ROUTES: RestRoute[] = [
     id: "health",
     path: "/health",
     method: "GET",
-    summary: "Health do servidor",
-    description: "Retorna status e versão do use-terminal.",
+    summary: "Server health",
+    description: "Returns the use-terminal status and version.",
     tags: ["system"],
     responses: [
       {
@@ -223,18 +223,18 @@ export const ROUTES: RestRoute[] = [
     id: "sessions_list",
     path: "/sessions",
     method: "GET",
-    summary: "Lista sessões",
-    description: "Retorna metadados de todas as sessões abertas no manager.",
+    summary: "List sessions",
+    description: "Returns metadata for all sessions open in the manager.",
     tags: ["sessions"],
     mcpTool: {
       name: "sessions_list",
-      description: "Lista todas as sessões ativas com metadados (id, status, pid, cwd, dimensões).",
+      description: "Lists all active sessions with metadata (id, status, pid, cwd, dimensions).",
       inputSchema: { type: "object", properties: {}, additionalProperties: false },
     },
     responses: [
       {
         status: 200,
-        description: "Lista de sessões",
+        description: "Session list",
         schema: { type: "array", items: { $ref: "#/components/schemas/SessionInfo" } },
       },
     ],
@@ -243,33 +243,33 @@ export const ROUTES: RestRoute[] = [
     id: "sessions_create",
     path: "/sessions",
     method: "POST",
-    summary: "Cria sessão",
-    description: "Cria uma sessão PTY (shell por padrão ou comando explícito) e retorna o SessionInfo.",
+    summary: "Create session",
+    description: "Creates a PTY session (shell by default or an explicit command) and returns SessionInfo.",
     tags: ["sessions"],
     requestBody: { $ref: "#/components/schemas/SessionOptions" },
     mcpTool: {
       name: "sessions_create",
       description:
-        "Cria uma sessão de terminal real (PTY). Usa $SHELL por padrão; aceita command/args para programas específicos (TUIs, REPLs). headed=true também abre o viewer.",
+        "Creates a real terminal session (PTY). Uses $SHELL by default; accepts command/args for specific programs (TUIs, REPLs). headed=true also opens the viewer.",
       inputSchema: {
         type: "object",
         properties: COMPONENT_SCHEMAS.SessionOptions!.properties,
         additionalProperties: false,
       },
     },
-    responses: [{ status: 201, description: "Sessão criada", schema: { $ref: "#/components/schemas/SessionInfo" } }],
+    responses: [{ status: 201, description: "Session created", schema: { $ref: "#/components/schemas/SessionInfo" } }],
   },
   {
     id: "session_info",
     path: "/sessions/{id}",
     method: "GET",
-    summary: "Metadados da sessão",
-    description: "Retorna SessionInfo da sessão (status, pid, cwd, dimensões, exitCode).",
+    summary: "Session metadata",
+    description: "Returns session SessionInfo (status, pid, cwd, dimensions, exitCode).",
     tags: ["sessions"],
-    pathParams: [{ name: "id", description: "ID da sessão (UUID)" }],
+    pathParams: [{ name: "id", description: "Session ID (UUID)" }],
     mcpTool: {
       name: "sessions_info",
-      description: "Retorna os metadados da sessão (status, pid, cwd, dimensões, exitCode).",
+      description: "Returns session metadata (status, pid, cwd, dimensions, exitCode).",
       inputSchema: {
         type: "object",
         properties: { sessionId: { type: "string" } },
@@ -278,25 +278,25 @@ export const ROUTES: RestRoute[] = [
       },
     },
     responses: [
-      { status: 200, description: "Sessão encontrada", schema: { $ref: "#/components/schemas/SessionInfo" } },
-      { status: 404, description: "Sessão não encontrada", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 200, description: "Session found", schema: { $ref: "#/components/schemas/SessionInfo" } },
+      { status: 404, description: "Session not found", schema: { $ref: "#/components/schemas/Error" } },
     ],
   },
   {
     id: "session_snapshot",
     path: "/sessions/{id}/snapshot",
     method: "GET",
-    summary: "Snapshot da tela",
-    description: "Snapshot textual (padrão), bruto (células) ou semântico (árvore heurística).",
+    summary: "Screen snapshot",
+    description: "Text (default), raw (cells), or semantic (heuristic tree) snapshot.",
     tags: ["sessions"],
-    pathParams: [{ name: "id", description: "ID da sessão" }],
+    pathParams: [{ name: "id", description: "Session ID" }],
     queryParams: [
-      { name: "mode", description: "Modo do snapshot", schema: { $ref: "#/components/schemas/SnapshotMode" } },
+      { name: "mode", description: "Snapshot mode", schema: { $ref: "#/components/schemas/SnapshotMode" } },
     ],
     mcpTool: {
       name: "sessions_snapshot",
       description:
-        "Retorna o snapshot da tela: text (padrão), raw (células + scrollback + viewport) ou semantic (árvore heurística com ações sugeridas).",
+        "Returns the screen snapshot: text (default), raw (cells + scrollback + viewport), or semantic (heuristic tree with suggested actions).",
       inputSchema: {
         type: "object",
         properties: { sessionId: { type: "string" }, mode: { $ref: "#/components/schemas/SnapshotMode" } },
@@ -306,25 +306,25 @@ export const ROUTES: RestRoute[] = [
     },
     responses: [
       { status: 200, description: "Snapshot", schema: { $ref: "#/components/schemas/Snapshot" } },
-      { status: 404, description: "Sessão não encontrada", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 404, description: "Session not found", schema: { $ref: "#/components/schemas/Error" } },
     ],
   },
   {
     id: "session_screenshot",
     path: "/sessions/{id}/screenshot",
     method: "GET",
-    summary: "Screenshot da tela",
-    description: "Renderiza a tela em SVG (padrão) ou PNG.",
+    summary: "Screen screenshot",
+    description: "Renders the screen as SVG (default) or PNG.",
     tags: ["sessions"],
-    pathParams: [{ name: "id", description: "ID da sessão" }],
+    pathParams: [{ name: "id", description: "Session ID" }],
     queryParams: [
-      { name: "format", description: "svg (padrão) ou png", schema: { type: "string", enum: ["svg", "png"] } },
-      { name: "cellWidth", description: "Largura da célula em px", schema: { type: "integer" } },
-      { name: "cellHeight", description: "Altura da célula em px", schema: { type: "integer" } },
+      { name: "format", description: "svg (default) or png", schema: { type: "string", enum: ["svg", "png"] } },
+      { name: "cellWidth", description: "Cell width in px", schema: { type: "integer" } },
+      { name: "cellHeight", description: "Cell height in px", schema: { type: "integer" } },
     ],
     mcpTool: {
       name: "sessions_screenshot",
-      description: "Retorna a tela renderizada como imagem (SVG ou PNG, base64).",
+      description: "Returns the rendered screen as an image (SVG or PNG, base64).",
       inputSchema: {
         type: "object",
         properties: {
@@ -338,24 +338,24 @@ export const ROUTES: RestRoute[] = [
       },
     },
     responses: [
-      { status: 200, description: "Imagem", contentType: "image/svg+xml ou image/png" },
-      { status: 400, description: "Formato inválido", schema: { $ref: "#/components/schemas/Error" } },
-      { status: 404, description: "Sessão não encontrada", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 200, description: "Image", contentType: "image/svg+xml or image/png" },
+      { status: 400, description: "Invalid format", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 404, description: "Session not found", schema: { $ref: "#/components/schemas/Error" } },
     ],
   },
   {
     id: "session_input",
     path: "/sessions/{id}/input",
     method: "POST",
-    summary: "Escreve bytes no PTY (low-level)",
-    description: 'Escreve texto/bytes crus no stdin do PTY. Body: string JSON (ex.: "cmd\\r") ou texto puro.',
+    summary: "Write bytes to the PTY (low-level)",
+    description: 'Writes raw text/bytes to the PTY stdin. Body: JSON string (for example, "cmd\\r") or plain text.',
     tags: ["sessions"],
-    pathParams: [{ name: "id", description: "ID da sessão" }],
-    requestBody: { type: "string", description: "Texto (string JSON ou texto puro) a escrever no PTY" },
+    pathParams: [{ name: "id", description: "Session ID" }],
+    requestBody: { type: "string", description: "Text (JSON string or plain text) to write to the PTY" },
     mcpTool: {
       name: "sessions_input",
       description:
-        "Escreve bytes crus no PTY (low-level). Use strings de escape (\\r, \\x1b) para teclas e sequências VT.",
+        "Writes raw bytes to the PTY (low-level). Use escape strings (\\r, \\x1b) for keys and VT sequences.",
       inputSchema: {
         type: "object",
         properties: { sessionId: { type: "string" }, data: { type: "string" } },
@@ -365,22 +365,22 @@ export const ROUTES: RestRoute[] = [
     },
     responses: [
       { status: 200, description: "OK", schema: OK_SCHEMA },
-      { status: 400, description: "Body não é string", schema: { $ref: "#/components/schemas/Error" } },
-      { status: 404, description: "Sessão não encontrada", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 400, description: "Body is not a string", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 404, description: "Session not found", schema: { $ref: "#/components/schemas/Error" } },
     ],
   },
   {
     id: "session_key",
     path: "/sessions/{id}/key",
     method: "POST",
-    summary: "Envia tecla especial (high-level)",
-    description: "Envia teclas especiais mapeadas (ENTER, TAB, CTRL_C, CTRL_D, CTRL_Z).",
+    summary: "Send a special key (high-level)",
+    description: "Sends mapped special keys (ENTER, TAB, CTRL_C, CTRL_D, CTRL_Z).",
     tags: ["sessions"],
-    pathParams: [{ name: "id", description: "ID da sessão" }],
+    pathParams: [{ name: "id", description: "Session ID" }],
     requestBody: { type: "object", properties: { key: { $ref: "#/components/schemas/KeyName" } }, required: ["key"] },
     mcpTool: {
       name: "sessions_key",
-      description: "Envia uma tecla especial mapeada (ENTER, TAB, CTRL_C, CTRL_D, CTRL_Z).",
+      description: "Sends a mapped special key (ENTER, TAB, CTRL_C, CTRL_D, CTRL_Z).",
       inputSchema: {
         type: "object",
         properties: { sessionId: { type: "string" }, key: { $ref: "#/components/schemas/KeyName" } },
@@ -390,30 +390,30 @@ export const ROUTES: RestRoute[] = [
     },
     responses: [
       { status: 200, description: "OK", schema: OK_SCHEMA },
-      { status: 400, description: "Tecla inválida", schema: { $ref: "#/components/schemas/Error" } },
-      { status: 404, description: "Sessão não encontrada", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 400, description: "Invalid key", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 404, description: "Session not found", schema: { $ref: "#/components/schemas/Error" } },
     ],
   },
   {
     id: "session_type",
     path: "/sessions/{id}/type",
     method: "POST",
-    summary: "Digita texto com Enter opcional (high-level)",
-    description: "Digita o texto e, se submit=true, envia Enter na mesma chamada.",
+    summary: "Type text with optional Enter (high-level)",
+    description: "Types text and, if submit=true, sends Enter in the same call.",
     tags: ["sessions"],
-    pathParams: [{ name: "id", description: "ID da sessão" }],
+    pathParams: [{ name: "id", description: "Session ID" }],
     requestBody: {
       type: "object",
       properties: {
         text: { type: "string" },
-        submit: { type: "boolean", description: "Envia Enter após o texto (padrão: false)" },
+        submit: { type: "boolean", description: "Sends Enter after the text (default: false)" },
       },
       required: ["text"],
     },
     mcpTool: {
       name: "sessions_type",
       description:
-        "Digita texto na sessão (high-level). Com submit=true envia o Enter na mesma chamada — use para executar comandos.",
+        "Types text in the session (high-level). With submit=true, sends Enter in the same call — use it to execute commands.",
       inputSchema: {
         type: "object",
         properties: { sessionId: { type: "string" }, text: { type: "string" }, submit: { type: "boolean" } },
@@ -423,23 +423,24 @@ export const ROUTES: RestRoute[] = [
     },
     responses: [
       { status: 200, description: "OK", schema: OK_SCHEMA },
-      { status: 400, description: "text ausente", schema: { $ref: "#/components/schemas/Error" } },
-      { status: 404, description: "Sessão não encontrada", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 400, description: "text is missing", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 404, description: "Session not found", schema: { $ref: "#/components/schemas/Error" } },
     ],
   },
   {
     id: "session_mouse",
     path: "/sessions/{id}/mouse",
     method: "POST",
-    summary: "Evento de mouse (low-level)",
-    description: "click, move, press, release ou wheel. Wheel sem mouse tracking ativo rola o viewport local.",
+    summary: "Mouse event (low-level)",
+    description:
+      "click, move, press, release, or wheel. Without active mouse tracking, wheel scrolls the local viewport.",
     tags: ["sessions"],
-    pathParams: [{ name: "id", description: "ID da sessão" }],
+    pathParams: [{ name: "id", description: "Session ID" }],
     requestBody: { $ref: "#/components/schemas/MouseEvent" },
     mcpTool: {
       name: "sessions_mouse",
       description:
-        "Envia eventos de mouse (click/move/press/release/wheel) em SGR. Se a TUI habilitou mouse tracking, os eventos vão para o processo; wheel sem tracking rola o viewport local.",
+        "Sends mouse events (click/move/press/release/wheel) in SGR. If the TUI enabled mouse tracking, events go to the process; without tracking, wheel scrolls the local viewport.",
       inputSchema: {
         type: "object",
         properties: COMPONENT_SCHEMAS.MouseEvent!.properties,
@@ -449,18 +450,18 @@ export const ROUTES: RestRoute[] = [
     },
     responses: [
       { status: 200, description: "OK", schema: OK_SCHEMA },
-      { status: 400, description: "Evento inválido", schema: { $ref: "#/components/schemas/Error" } },
-      { status: 404, description: "Sessão não encontrada", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 400, description: "Invalid event", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 404, description: "Session not found", schema: { $ref: "#/components/schemas/Error" } },
     ],
   },
   {
     id: "session_drag",
     path: "/sessions/{id}/drag",
     method: "POST",
-    summary: "Arraste de mouse (high-level)",
-    description: "Press em `from`, move para `to`, release em `to`.",
+    summary: "Mouse drag (high-level)",
+    description: "Press at `from`, move to `to`, and release at `to`.",
     tags: ["sessions"],
-    pathParams: [{ name: "id", description: "ID da sessão" }],
+    pathParams: [{ name: "id", description: "Session ID" }],
     requestBody: {
       type: "object",
       properties: {
@@ -471,7 +472,7 @@ export const ROUTES: RestRoute[] = [
     },
     mcpTool: {
       name: "sessions_drag",
-      description: "Executa um arraste de mouse (press → move → release) na sessão.",
+      description: "Performs a mouse drag (press → move → release) in the session.",
       inputSchema: {
         type: "object",
         properties: {
@@ -489,30 +490,30 @@ export const ROUTES: RestRoute[] = [
     },
     responses: [
       { status: 200, description: "OK", schema: OK_SCHEMA },
-      { status: 400, description: "Parâmetros inválidos", schema: { $ref: "#/components/schemas/Error" } },
-      { status: 404, description: "Sessão não encontrada", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 400, description: "Invalid parameters", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 404, description: "Session not found", schema: { $ref: "#/components/schemas/Error" } },
     ],
   },
   {
     id: "session_viewport",
     path: "/sessions/{id}/viewport",
     method: "POST",
-    summary: "Controla viewport/scrollback",
+    summary: "Controls viewport/scrollback",
     description:
-      "Define offset (posição absoluta no scrollback) ou delta (rolagem relativa). Retorna o snapshot raw atualizado.",
+      "Sets offset (absolute position in scrollback) or delta (relative scroll). Returns the updated raw snapshot.",
     tags: ["sessions"],
-    pathParams: [{ name: "id", description: "ID da sessão" }],
+    pathParams: [{ name: "id", description: "Session ID" }],
     requestBody: {
       type: "object",
       properties: {
-        offset: { type: "integer", description: "Offset absoluto (linha 0 = topo do scrollback)" },
-        delta: { type: "integer", description: "Rolagem relativa (positivo = para baixo)" },
+        offset: { type: "integer", description: "Absolute offset (line 0 = top of scrollback)" },
+        delta: { type: "integer", description: "Relative scroll (positive means down)" },
       },
     },
     mcpTool: {
       name: "sessions_viewport",
       description:
-        "Navega o scrollback da sessão: offset (posicional) ou delta (relativo). Retorna o snapshot raw da tela visível.",
+        "Navigates the session scrollback: offset (absolute) or delta (relative). Returns the raw snapshot of the visible screen.",
       inputSchema: {
         type: "object",
         properties: { sessionId: { type: "string" }, offset: { type: "integer" }, delta: { type: "integer" } },
@@ -521,28 +522,32 @@ export const ROUTES: RestRoute[] = [
       },
     },
     responses: [
-      { status: 200, description: "Snapshot raw atualizado", schema: { $ref: "#/components/schemas/Snapshot" } },
-      { status: 400, description: "Nem offset nem delta informados", schema: { $ref: "#/components/schemas/Error" } },
-      { status: 404, description: "Sessão não encontrada", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 200, description: "Updated raw snapshot", schema: { $ref: "#/components/schemas/Snapshot" } },
+      {
+        status: 400,
+        description: "Neither offset nor delta was provided",
+        schema: { $ref: "#/components/schemas/Error" },
+      },
+      { status: 404, description: "Session not found", schema: { $ref: "#/components/schemas/Error" } },
     ],
   },
   {
     id: "session_wait",
     path: "/sessions/{id}/wait",
     method: "POST",
-    summary: "Espera por texto na tela (high-level)",
-    description: "Aguarda até o texto aparecer no snapshot text ou o timeout expirar.",
+    summary: "Wait for text on screen (high-level)",
+    description: "Waits until the text appears in the text snapshot or the timeout expires.",
     tags: ["sessions"],
-    pathParams: [{ name: "id", description: "ID da sessão" }],
+    pathParams: [{ name: "id", description: "Session ID" }],
     requestBody: {
       type: "object",
-      properties: { text: { type: "string" }, timeoutMs: { type: "integer", description: "Padrão: 10000" } },
+      properties: { text: { type: "string" }, timeoutMs: { type: "integer", description: "Default: 10000" } },
       required: ["text"],
     },
     mcpTool: {
       name: "sessions_wait",
       description:
-        "Aguarda (com timeout) até o texto aparecer na tela. Essencial para automatizar programas interativos.",
+        "Waits, with a timeout, for text to appear on screen. Essential for automating interactive programs.",
       inputSchema: {
         type: "object",
         properties: { sessionId: { type: "string" }, text: { type: "string" }, timeoutMs: { type: "integer" } },
@@ -553,30 +558,30 @@ export const ROUTES: RestRoute[] = [
     responses: [
       {
         status: 200,
-        description: "Texto encontrado",
+        description: "Text found",
         schema: { type: "object", properties: { ok: { type: "boolean" }, text: { type: "string" } }, required: ["ok"] },
       },
-      { status: 504, description: "Timeout esperando texto", schema: { $ref: "#/components/schemas/Error" } },
-      { status: 404, description: "Sessão não encontrada", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 504, description: "Timeout waiting for text", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 404, description: "Session not found", schema: { $ref: "#/components/schemas/Error" } },
     ],
   },
   {
     id: "session_events",
     path: "/sessions/{id}/events",
     method: "GET",
-    summary: "Coleta eventos em janela (polling)",
+    summary: "Collect events in a polling window",
     description:
-      "Retorna até maxEvents eventos (data/screen/exit) coletados em até timeoutMs. Streaming contínuo via SSE em /stream.",
+      "Returns up to maxEvents events (data/screen/exit) collected within timeoutMs. Continuous streaming is available through SSE at /stream.",
     tags: ["sessions"],
-    pathParams: [{ name: "id", description: "ID da sessão" }],
+    pathParams: [{ name: "id", description: "Session ID" }],
     queryParams: [
-      { name: "maxEvents", description: "Máximo de eventos (padrão: 50)", schema: { type: "integer" } },
-      { name: "timeoutMs", description: "Janela de coleta em ms (padrão: 2000)", schema: { type: "integer" } },
+      { name: "maxEvents", description: "Maximum events (default: 50)", schema: { type: "integer" } },
+      { name: "timeoutMs", description: "Collection window in ms (default: 2000)", schema: { type: "integer" } },
     ],
     mcpTool: {
       name: "sessions_events",
       description:
-        "Coleta eventos do terminal (data/screen/exit) em uma janela limitada — alternativa ao SSE em MCP stdio.",
+        "Collects terminal events (data/screen/exit) within a limited window — an alternative to SSE over MCP stdio.",
       inputSchema: {
         type: "object",
         properties: { sessionId: { type: "string" }, maxEvents: { type: "integer" }, timeoutMs: { type: "integer" } },
@@ -587,28 +592,28 @@ export const ROUTES: RestRoute[] = [
     responses: [
       {
         status: 200,
-        description: "Lista de eventos",
+        description: "Event list",
         schema: {
           type: "object",
           properties: { events: { type: "array", items: { $ref: "#/components/schemas/TerminalEvent" } } },
           required: ["events"],
         },
       },
-      { status: 404, description: "Sessão não encontrada", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 404, description: "Session not found", schema: { $ref: "#/components/schemas/Error" } },
     ],
   },
   {
     id: "session_signal",
     path: "/sessions/{id}/signal",
     method: "POST",
-    summary: "Envia sinal POSIX",
-    description: "Body: texto puro com o nome do sinal (SIGINT, SIGTERM, SIGKILL, SIGTSTP, SIGHUP).",
+    summary: "Send a POSIX signal",
+    description: "Body: plain text containing the signal name (SIGINT, SIGTERM, SIGKILL, SIGTSTP, SIGHUP).",
     tags: ["sessions"],
-    pathParams: [{ name: "id", description: "ID da sessão" }],
-    requestBody: { type: "string", description: "Nome do sinal (ex.: SIGINT)" },
+    pathParams: [{ name: "id", description: "Session ID" }],
+    requestBody: { type: "string", description: "Signal name (for example, SIGINT)" },
     mcpTool: {
       name: "sessions_signal",
-      description: "Envia um sinal POSIX para o processo da sessão.",
+      description: "Sends a POSIX signal to the session process.",
       inputSchema: {
         type: "object",
         properties: { sessionId: { type: "string" }, signal: { $ref: "#/components/schemas/SignalName" } },
@@ -618,18 +623,18 @@ export const ROUTES: RestRoute[] = [
     },
     responses: [
       { status: 200, description: "OK", schema: OK_SCHEMA },
-      { status: 400, description: "Sinal inválido", schema: { $ref: "#/components/schemas/Error" } },
-      { status: 404, description: "Sessão não encontrada", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 400, description: "Invalid signal", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 404, description: "Session not found", schema: { $ref: "#/components/schemas/Error" } },
     ],
   },
   {
     id: "session_resize",
     path: "/sessions/{id}/resize",
     method: "POST",
-    summary: "Redimensiona PTY",
-    description: "Altera cols/rows do emulador e do PTY.",
+    summary: "Resize PTY",
+    description: "Changes emulator and PTY cols/rows.",
     tags: ["sessions"],
-    pathParams: [{ name: "id", description: "ID da sessão" }],
+    pathParams: [{ name: "id", description: "Session ID" }],
     requestBody: {
       type: "object",
       properties: { cols: { type: "integer", minimum: 1 }, rows: { type: "integer", minimum: 1 } },
@@ -637,7 +642,7 @@ export const ROUTES: RestRoute[] = [
     },
     mcpTool: {
       name: "sessions_resize",
-      description: "Redimensiona a sessão (cols/rows) do emulador e do PTY.",
+      description: "Resizes session (cols/rows) for the emulator and PTY.",
       inputSchema: {
         type: "object",
         properties: { sessionId: { type: "string" }, cols: { type: "integer" }, rows: { type: "integer" } },
@@ -646,23 +651,23 @@ export const ROUTES: RestRoute[] = [
       },
     },
     responses: [
-      { status: 200, description: "SessionInfo atualizado", schema: { $ref: "#/components/schemas/SessionInfo" } },
-      { status: 404, description: "Sessão não encontrada", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 200, description: "Updated SessionInfo", schema: { $ref: "#/components/schemas/SessionInfo" } },
+      { status: 404, description: "Session not found", schema: { $ref: "#/components/schemas/Error" } },
     ],
   },
   {
     id: "session_clipboard_copy",
     path: "/sessions/{id}/clipboard/copy",
     method: "POST",
-    summary: "Copia texto para o clipboard do host",
-    description: "Usa xclip/xsel/wl-copy se disponível no host.",
+    summary: "Copy text to the host clipboard",
+    description: "Uses xclip/xsel/wl-copy if available on the host.",
     tags: ["sessions"],
-    pathParams: [{ name: "id", description: "ID da sessão" }],
+    pathParams: [{ name: "id", description: "Session ID" }],
     requestBody: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },
     mcpTool: {
       name: "sessions_clipboard_copy",
       description:
-        "Copia o texto para o clipboard do host (requer xclip/xsel/wl-copy instalados). Retorna copied=false se nenhum tool estiver disponível.",
+        "Copies text to the host clipboard (requires xclip/xsel/wl-copy to be installed). Returns copied=false if no tool is available.",
       inputSchema: {
         type: "object",
         properties: { sessionId: { type: "string" }, text: { type: "string" } },
@@ -673,27 +678,27 @@ export const ROUTES: RestRoute[] = [
     responses: [
       {
         status: 200,
-        description: "Resultado",
+        description: "Result",
         schema: {
           type: "object",
           properties: { ok: { type: "boolean" }, copied: { type: "boolean" } },
           required: ["ok", "copied"],
         },
       },
-      { status: 404, description: "Sessão não encontrada", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 404, description: "Session not found", schema: { $ref: "#/components/schemas/Error" } },
     ],
   },
   {
     id: "session_clipboard_paste",
     path: "/sessions/{id}/clipboard/paste",
     method: "POST",
-    summary: "Cola o clipboard do host no PTY",
-    description: "Lê o clipboard do host e escreve no PTY da sessão.",
+    summary: "Paste the host clipboard into the PTY",
+    description: "Reads the host clipboard and writes it to the session PTY.",
     tags: ["sessions"],
-    pathParams: [{ name: "id", description: "ID da sessão" }],
+    pathParams: [{ name: "id", description: "Session ID" }],
     mcpTool: {
       name: "sessions_clipboard_paste",
-      description: "Lê o clipboard do host e escreve o conteúdo no PTY da sessão.",
+      description: "Reads the host clipboard and writes its contents to the session PTY.",
       inputSchema: {
         type: "object",
         properties: { sessionId: { type: "string" } },
@@ -704,78 +709,78 @@ export const ROUTES: RestRoute[] = [
     responses: [
       {
         status: 200,
-        description: "Resultado",
+        description: "Result",
         schema: {
           type: "object",
           properties: { ok: { type: "boolean" }, pasted: { type: "boolean" } },
           required: ["ok", "pasted"],
         },
       },
-      { status: 404, description: "Sessão não encontrada", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 404, description: "Session not found", schema: { $ref: "#/components/schemas/Error" } },
     ],
   },
   {
     id: "session_stream",
     path: "/sessions/{id}/stream",
     method: "GET",
-    summary: "Stream SSE de eventos",
-    description: "SSE com eventos data/screen/exit. mode: text (padrão), raw ou semantic.",
+    summary: "SSE event stream",
+    description: "SSE with data/screen/exit events. mode: text (default), raw, or semantic.",
     tags: ["sessions"],
-    pathParams: [{ name: "id", description: "ID da sessão" }],
+    pathParams: [{ name: "id", description: "Session ID" }],
     queryParams: [
       {
         name: "mode",
-        description: "Modo do snapshot nos eventos screen",
+        description: "Snapshot mode for screen events",
         schema: { $ref: "#/components/schemas/SnapshotMode" },
       },
     ],
     streaming: true,
     responses: [
-      { status: 200, description: "Fluxo SSE", contentType: "text/event-stream" },
-      { status: 400, description: "Modo inválido", schema: { $ref: "#/components/schemas/Error" } },
-      { status: 404, description: "Sessão não encontrada", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 200, description: "SSE stream", contentType: "text/event-stream" },
+      { status: 400, description: "Invalid mode", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 404, description: "Session not found", schema: { $ref: "#/components/schemas/Error" } },
     ],
   },
   {
     id: "session_viewer",
     path: "/sessions/{id}/viewer",
     method: "GET",
-    summary: "Viewer web da sessão",
-    description: "Página HTML do viewer interativo (WebSocket bidirecional).",
+    summary: "Session web viewer",
+    description: "Interactive viewer HTML page (bidirectional WebSocket).",
     tags: ["sessions"],
-    responses: [{ status: 200, description: "Página do viewer", contentType: "text/html" }],
+    responses: [{ status: 200, description: "Viewer page", contentType: "text/html" }],
   },
   {
     id: "viewer_root",
     path: "/viewer",
     method: "GET",
-    summary: "Viewer genérico",
-    description: "Página HTML do viewer; use ?session=<id> ou /sessions/{id}/viewer.",
+    summary: "Generic viewer",
+    description: "Viewer HTML page; use ?session=<id> or /sessions/{id}/viewer.",
     tags: ["sessions"],
-    responses: [{ status: 200, description: "Página do viewer", contentType: "text/html" }],
+    responses: [{ status: 200, description: "Viewer page", contentType: "text/html" }],
   },
   {
     id: "session_ws",
     path: "/sessions/{id}/ws",
     method: "GET",
-    summary: "WebSocket do viewer",
+    summary: "Viewer WebSocket",
     description:
-      "Upgrade WebSocket bidirecional: recebe snapshot inicial + eventos; aceita input/mouse/resize/viewport.",
+      "Bidirectional WebSocket upgrade: receives the initial snapshot and events; accepts input/mouse/resize/viewport.",
     tags: ["sessions"],
-    pathParams: [{ name: "id", description: "ID da sessão" }],
-    responses: [{ status: 101, description: "Upgrade para WebSocket" }],
+    pathParams: [{ name: "id", description: "Session ID" }],
+    responses: [{ status: 101, description: "WebSocket upgrade" }],
   },
   {
     id: "session_close",
     path: "/sessions/{id}/close",
     method: "DELETE",
-    summary: "Fecha a sessão",
-    description: "Encerra o processo (SIGTERM) e marca a sessão como closed.",
+    summary: "Close the session",
+    description: "Terminates the process (SIGTERM) and marks the session as closed.",
     tags: ["sessions"],
-    pathParams: [{ name: "id", description: "ID da sessão" }],
+    pathParams: [{ name: "id", description: "Session ID" }],
     mcpTool: {
       name: "sessions_close",
-      description: "Encerra a sessão (SIGTERM) e libera a PTY.",
+      description: "Closes the session (SIGTERM) and releases the PTY.",
       inputSchema: {
         type: "object",
         properties: { sessionId: { type: "string" } },
@@ -790,7 +795,8 @@ export const ROUTES: RestRoute[] = [
     path: "/docs",
     method: "GET",
     summary: "Swagger UI",
-    description: "Interface Swagger (via CDN unpkg; requer internet). OpenAPI em /docs/openapi.json.",
+    description:
+      "Swagger interface (through the unpkg CDN; requires internet). OpenAPI is available at /docs/openapi.json.",
     tags: ["system"],
     responses: [{ status: 200, description: "Swagger UI", contentType: "text/html" }],
   },
@@ -799,9 +805,9 @@ export const ROUTES: RestRoute[] = [
     path: "/docs/openapi.json",
     method: "GET",
     summary: "OpenAPI 3.1",
-    description: "Especificação OpenAPI 3.1 gerada da tabela de rotas (src/contracts.ts).",
+    description: "OpenAPI 3.1 specification generated from the route table (src/contracts.ts).",
     tags: ["system"],
-    responses: [{ status: 200, description: "Documento OpenAPI", contentType: "application/json" }],
+    responses: [{ status: 200, description: "OpenAPI document", contentType: "application/json" }],
   },
 ];
 
