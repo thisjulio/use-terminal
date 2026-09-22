@@ -1,5 +1,15 @@
 {
   "name": "use-terminal",
+  "version": "0.1.0",
+  "description": "Terminal PTY observável e programável para agentes LLM",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thisjulio/use-terminal.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "module": "index.ts",
   "type": "module",
   "scripts": {
