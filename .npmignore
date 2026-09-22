@@ -1,0 +1,10 @@
+AGENTS.md
+biome.json
+bun.lock
+index.test.ts
+tests/
+src/**/*.test.ts
+.github/
+.husky/
+.cagent/
+tsconfig.json

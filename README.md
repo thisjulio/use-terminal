@@ -107,6 +107,16 @@ O MVP assume um **ambiente confiável**:
 
 Logs terão redaction de padrões conhecidos, mas nenhum detector de segredos é perfeito.
 
+### Aviso para operadores
+
+O use-terminal é uma ferramenta privilegiada, não um sandbox. Uma sessão pode iniciar
+um shell configurável, escrever bytes diretamente no PTY, enviar sinais, ler a saída
+do processo e interagir com o clipboard. Portanto, qualquer caller que alcance o
+pacote, o servidor REST ou o MCP pode potencialmente executar comandos com os
+privilégios do usuário do processo. Execute-o somente em ambientes confiáveis,
+mantenha REST/MCP em localhost e implemente autenticação, autorização por sessão,
+limites e isolamento antes de expor essas interfaces a terceiros ou à rede.
+
 ## Status e roadmap
 
 | Área | Status |

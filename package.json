@@ -1,6 +1,6 @@
 {
   "name": "use-terminal",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Terminal PTY observável e programável para agentes LLM",
   "license": "MIT",
   "repository": {
@@ -10,6 +10,16 @@
   "publishConfig": {
     "access": "public"
   },
+  "files": [
+    "index.ts",
+    "src/**/*.ts",
+    "!src/**/*.test.ts",
+    "scripts/rest-server.ts",
+    "README.md",
+    "PRODUCT.md",
+    "ROADMAP.md",
+    "LICENSE"
+  ],
   "module": "index.ts",
   "type": "module",
   "scripts": {
