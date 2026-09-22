@@ -3,6 +3,9 @@
   "version": "0.1.2",
   "description": "Observable and programmable PTY terminal for LLM agents",
   "license": "MIT",
+  "bin": {
+    "use-terminal-mcp": "bin/use-terminal-mcp.ts"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/thisjulio/use-terminal.git"
@@ -14,11 +17,14 @@
     "index.ts",
     "src/**/*.ts",
     "!src/**/*.test.ts",
+    "bin/use-terminal-mcp.ts",
     "scripts/rest-server.ts",
     "README.md",
     "PRODUCT.md",
     "ROADMAP.md",
-    "LICENSE"
+    "LICENSE",
+    ".mcp.json",
+    ".vscode/mcp.json"
   ],
   "module": "index.ts",
   "type": "module",

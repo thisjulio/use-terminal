@@ -49,6 +49,7 @@ For agents that need to act like computer users, use-terminal provides a faithfu
 - **Composition:** the package should be useful without a server, and the server should be a thin adapter.
 - **Security honesty:** the MVP targets trusted environments and is not a sandbox.
 - **Explicit compatibility:** “full support” means a verifiable VT/ANSI feature matrix, not an unqualified promise without fixtures and tests.
+- **MCP-native integration:** the stdio server must be launchable by standard MCP clients through a documented `command`/`args` configuration and must keep stdout reserved for JSON-RPC.
 
 ## Broad MVP functional scope
 
@@ -92,14 +93,16 @@ For agents that need to act like computer users, use-terminal provides a faithfu
 
 - npm/Bun package as the programmatic core.
 - REST API on `127.0.0.1`, with a configurable port, request/response endpoints, SSE, health/version, and CORS disabled by default.
-- MCP stdio server in the first prototype.
+- MCP stdio server as a local integration for MCP clients. The launcher reads newline-delimited JSON-RPC from stdin and writes newline-delimited JSON-RPC to stdout.
 - REST and MCP must expose the same operations and validations, generated or validated by shared TypeScript schemas.
+- Repository configuration must include a portable `.mcp.json` example and a VS Code-compatible `.vscode/mcp.json` example.
 
 ### Observability
 
 - Complete structured logs with redaction of known token, key, and password patterns.
 - Events must include a timestamp, session ID, type, and appropriate payload.
 - Recording must not accidentally turn a secret into persisted text; redaction is a safeguard, not a perfect guarantee.
+- MCP protocol output must remain machine-readable. Diagnostics must use stderr rather than stdout.
 
 ## Initially out of scope, but part of the long-term goal
 
@@ -119,6 +122,8 @@ The MVP assumes a **trusted environment**. The use-terminal process can execute 
 
 Do not run untrusted code or commands with this MVP. Sandboxing and limits must be treated as requirements for a future version before remote or multi-tenant use.
 
+An MCP configuration file is executable configuration, not a permission boundary. Review the command, arguments, working directory, and environment variables before enabling a project-scoped server. An MCP client may start and control processes through this server with the privileges of the client host.
+
 ## Success criteria
 
 - Create and maintain a persistent bash/shell session through the package.
@@ -128,11 +133,18 @@ Do not run untrusted code or commands with this MVP. Sandboxing and limits must 
 - Receive incremental output without mandatory polling.
 - Execute the same operation through the package, REST, and MCP.
 - Use a low-level API to reproduce bytes and a high-level API to automate semantic actions.
+- Discover the MCP tools through `initialize` and `tools/list` from a standard MCP client.
+- Configure the local server through a committed `.mcp.json` entry and a VS Code-compatible workspace configuration.
 - Select and copy text in the viewport, navigate scrollback, and forward mouse events correctly when a TUI enables tracking.
 - Have emulator unit tests, PTY integration tests, REST/MCP contract tests, deterministic snapshots, a real TUI test, Linux CI, and an executable quickstart.
 
 ## References and context
 
+- [Playwright MCP](https://playwright.dev/docs/getting-started-mcp) — agent use for browser automation through a standard stdio MCP configuration.
+- [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp) — local developer-tool MCP packaging and client setup reference.
+- [MCP specification](https://modelcontextprotocol.io/specification/latest) — protocol and transport fundamentals.
+- [VS Code MCP configuration](https://code.visualstudio.com/docs/agents/reference/mcp-configuration) — workspace `mcp.json` structure and stdio fields.
+- [Claude Code MCP reference](https://code.claude.com/docs/en/mcp) — project-scoped `.mcp.json`, local stdio servers, and status commands.
 - [OpenAI CUA sample app](https://github.com/openai/openai-cua-sample-app) — agent use for operating computing environments.
 - [Anthropic tool use cookbook](https://github.com/anthropics/claude-cookbooks/tree/main/tool_use) — tool-use patterns.
 - [xterm.js](https://github.com/xtermjs/xterm.js) — web terminal emulator and compatibility reference.

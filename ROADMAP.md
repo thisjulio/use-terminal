@@ -53,8 +53,13 @@ This roadmap turns the vision in `PRODUCT.md` into verifiable increments. The lo
 - [x] Implement an MCP stdio server with equivalent operations.
 - [x] Create parity tests between the package, REST, and MCP.
 - [x] Document the `127.0.0.1` bind, disabled CORS, and absence of authentication.
+- [x] Document MCP client prerequisites, stdio startup, JSON-RPC framing, tool discovery, and first-call workflow.
+- [x] Add a portable project `.mcp.json` configuration for clients using `mcpServers`.
+- [x] Add a VS Code-compatible `.vscode/mcp.json` configuration using `servers` and `type: "stdio"`.
+- [x] Document Claude Code, VS Code, Cursor, and generic MCP client setup.
+- [x] Reserve stdout for MCP protocol messages and document the stderr rule for diagnostics.
 
-**Outcome:** an agent can choose the package, REST, or MCP without changing the capability model.
+**Outcome:** an agent can choose the package, REST, or MCP without changing the capability model, and a standard MCP client can discover and invoke the server.
 
 ## Phase 4 — Semantic snapshot
 
@@ -142,6 +147,8 @@ This roadmap turns the vision in `PRODUCT.md` into verifiable increments. The lo
 | PTY/parser library does not work well in Bun | Phase 0 spike and abstracted backend |
 | The terminal “DOM” creates false confidence | Mandatory raw snapshot and confidence-aware heuristics |
 | REST/MCP parity diverges | Shared schemas and contract tests |
+| MCP clients use incompatible configuration shapes | Document both `mcpServers` and VS Code `servers` formats, with tested stdio examples |
+| MCP protocol output is polluted by logs | Reserve stdout for JSON-RPC and route diagnostics to stderr |
 | TUIs depend on unsupported details | Real fixtures and an explicit compatibility matrix |
 | Selection and scrolling confuse the viewer with the TUI | Explicit viewport, alternate-screen, and mouse-tracking state |
 | The high-level API hides terminal behavior | Preserve raw bytes, events, and the raw snapshot in every operation |

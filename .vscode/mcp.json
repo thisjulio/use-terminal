@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "use-terminal": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "use-terminal@latest", "use-terminal-mcp"]
+    }
+  }
+}
