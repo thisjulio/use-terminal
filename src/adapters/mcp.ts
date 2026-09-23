@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import { MCP_TOOL_NAMES, ROUTES } from "../contracts";
+import { COMPONENT_SCHEMAS, MCP_TOOL_NAMES, ROUTES } from "../contracts";
 import { TerminalManager } from "../core/manager";
 import type { TerminalSession } from "../core/session";
 import type { SessionOptions, SignalName, Snapshot, MouseEvent as TerminalMouseEvent } from "../types";
@@ -23,6 +23,42 @@ export type JsonRpcResponse = {
 
 const PROTOCOL_VERSION = "2025-06-18";
 
+function inlineComponentRefs(value: unknown, resolving = new Set<string>()): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => inlineComponentRefs(item, resolving));
+  }
+
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  const object = value as Record<string, unknown>;
+  const reference = object.$ref;
+
+  if (typeof reference === "string" && reference.startsWith("#/components/schemas/")) {
+    const name = reference.slice("#/components/schemas/".length);
+    const schema = COMPONENT_SCHEMAS[name];
+
+    if (!schema) {
+      throw new Error(`Unknown component schema: ${name}`);
+    }
+
+    if (resolving.has(name)) {
+      throw new Error(`Recursive component schema: ${name}`);
+    }
+
+    const nextResolving = new Set(resolving);
+    nextResolving.add(name);
+    const { $ref: _ignored, ...siblings } = object;
+
+    return inlineComponentRefs({ ...schema, ...siblings }, nextResolving);
+  }
+
+  return Object.fromEntries(
+    Object.entries(object).map(([key, child]) => [key, inlineComponentRefs(child, resolving)]),
+  );
+}
+
 function toolResult(value: unknown): { content: { type: "text"; text: string }[]; isError?: boolean } {
   return { content: [{ type: "text", text: typeof value === "string" ? value : JSON.stringify(value) }] };
 }
@@ -34,7 +70,11 @@ function toolError(message: string): { content: { type: "text"; text: string }[]
 export function mcpTools(): McpTool[] {
   return ROUTES.filter((route) => route.mcpTool).map((route) => {
     const tool = route.mcpTool!;
-    return { name: tool.name, description: tool.description, inputSchema: tool.inputSchema as Record<string, unknown> };
+    return {
+      name: tool.name,
+      description: tool.description,
+      inputSchema: inlineComponentRefs(tool.inputSchema) as Record<string, unknown>,
+    };
   });
 }
 
@@ -264,7 +304,7 @@ export function runMcpStdio(
         send({ jsonrpc: "2.0", id: null, error: { code: -32700, message: "Parse error" } });
         continue;
       }
-      send(await handleMcpMessage(request, manager));
+      void handleMcpMessage(request, manager).then(send);
     }
   };
 

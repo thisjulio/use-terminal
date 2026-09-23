@@ -22,7 +22,10 @@ export class TerminalSession {
   private status: SessionInfo["status"] = "running";
   private exitCode?: number;
   private eventsQueue: TerminalEvent[] = [];
-  private waiters: ((event: TerminalEvent) => void)[] = [];
+  private waiters: Array<{
+    resolve: (event: TerminalEvent) => void;
+    reject: (error: Error) => void;
+  }> = [];
   private screenWaiters: Array<{
     text: string;
     resolve: () => void;
@@ -82,7 +85,6 @@ export class TerminalSession {
       for (const waiter of [...this.screenWaiters]) {
         if (!snapshot.text?.includes(waiter.text)) continue;
         clearTimeout(waiter.timer);
-        this.screenWaiters.splice(this.screenWaiters.indexOf(waiter), 1);
         waiter.resolve();
       }
     });
@@ -90,6 +92,8 @@ export class TerminalSession {
       this.status = "exited";
       this.exitCode = exitCode;
       this.emit({ type: "exit", exitCode });
+      this.rejectScreenWaiters("Session exited before text appeared");
+      this.rejectEventWaiters("Session exited");
     });
   }
 
@@ -116,7 +120,7 @@ export class TerminalSession {
   private emit(partial: Omit<TerminalEvent, "id" | "sessionId" | "timestamp">): void {
     const event = { ...partial, id: randomUUID(), sessionId: this.id, timestamp: Date.now() };
     const waiter = this.waiters.shift();
-    if (waiter) waiter(event);
+    if (waiter) waiter.resolve(event);
     else this.eventsQueue.push(event);
   }
 
@@ -275,7 +279,12 @@ export class TerminalSession {
 
   async waitForText(text: string, timeout = 10000): Promise<void> {
     if (this.snapshot("text").text?.includes(text)) return;
+    if (this.status !== "running") throw new Error(`Session exited before text appeared: ${text}`);
     await new Promise<void>((resolve, reject) => {
+      if (this.status !== "running") {
+        reject(new Error(`Session exited before text appeared: ${text}`));
+        return;
+      }
       const waiter = {
         text,
         resolve: () => {
@@ -300,8 +309,11 @@ export class TerminalSession {
 
   private nextEvent(timeout: number): Promise<TerminalEvent> {
     if (this.eventsQueue.length) return Promise.resolve(this.eventsQueue.shift()!);
+    if (this.status === "closed" || this.status === "exited") {
+      return Promise.resolve({} as TerminalEvent);
+    }
     return new Promise((resolve, reject) => {
-      let waiter: (event: TerminalEvent) => void;
+      let waiter: { resolve: (event: TerminalEvent) => void; reject: (error: Error) => void };
       const timer = Number.isFinite(timeout)
         ? setTimeout(() => {
             const index = this.waiters.indexOf(waiter);
@@ -309,9 +321,15 @@ export class TerminalSession {
             reject(new Error("event timeout"));
           }, timeout)
         : undefined;
-      waiter = (event) => {
-        if (timer) clearTimeout(timer);
-        resolve(event);
+      waiter = {
+        resolve: (event) => {
+          if (timer) clearTimeout(timer);
+          resolve(event);
+        },
+        reject: (error) => {
+          if (timer) clearTimeout(timer);
+          reject(error);
+        },
       };
       this.waiters.push(waiter);
     });
@@ -342,10 +360,21 @@ export class TerminalSession {
       }
     }
   }
+  private rejectScreenWaiters(message: string): void {
+    for (const waiter of [...this.screenWaiters]) {
+      clearTimeout(waiter.timer);
+      waiter.reject(new Error(`${message}: ${waiter.text}`));
+    }
+  }
+  private rejectEventWaiters(message: string): void {
+    for (const waiter of this.waiters.splice(0)) waiter.reject(new Error(message));
+  }
   close(): void {
     if (this.status !== "closed" && this.status !== "exited") {
       this.proc?.kill("SIGTERM");
       this.status = "closed";
+      this.rejectScreenWaiters("Session closed before text appeared");
+      this.rejectEventWaiters("Session closed");
     }
   }
 }

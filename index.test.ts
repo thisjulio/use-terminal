@@ -58,6 +58,49 @@ test("waitForText reports a stable timeout error", async () => {
   session.close();
 });
 
+test("waitForText does not miss output while registering its observer", async () => {
+  const session = await TerminalSession.create({
+    command: "/bin/sh",
+    args: ["-c", "printf 'registration-race-ok\\n'; sleep 1"],
+    cols: 40,
+    rows: 5,
+  });
+
+  await session.waitForText("registration-race-ok", 2000);
+  session.close();
+});
+
+test("waitForText rejects when the session exits before the text appears", async () => {
+  const session = await TerminalSession.create({
+    command: "/bin/sh",
+    args: ["-c", "exit 7"],
+    cols: 40,
+    rows: 5,
+  });
+
+  await expect(session.waitForText("text-after-exit", 2000)).rejects.toThrow(
+    "Session exited before text appeared: text-after-exit",
+  );
+});
+
+test("independent waiters do not cancel one another", async () => {
+  const session = await TerminalSession.create({ shell: "/bin/sh", cols: 40, rows: 5 });
+  const first = session.waitForText("first-independent-wait", 2000);
+  const second = session.waitForText("second-independent-wait", 2000);
+
+  await session.write("printf 'first-independent-wait\\n'; sleep 0.05; printf 'second-independent-wait\\n'");
+  await Promise.all([first, second]);
+  session.close();
+});
+
+test("closing a session rejects pending text waits immediately", async () => {
+  const session = await TerminalSession.create({ command: "cat", cols: 40, rows: 5 });
+  const pending = session.waitForText("text-after-close", 2000);
+
+  session.close();
+  await expect(pending).rejects.toThrow("Session exited before text appeared: text-after-close");
+});
+
 test("sendKey works immediately for an interactive process", async () => {
   const session = await TerminalSession.create({ command: "cat", cols: 40, rows: 5 });
 
