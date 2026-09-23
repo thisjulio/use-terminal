@@ -39,6 +39,68 @@ test("real PTY preserves output, dimensions, and interactive session", async () 
   s.close();
 });
 
+test("concurrent waiters all observe the same screen change", async () => {
+  const session = await TerminalSession.create({ shell: "/bin/sh", cols: 40, rows: 5 });
+  const first = session.waitForText("shared-wait-ok", 2000);
+  const second = session.waitForText("shared-wait-ok", 2000);
+
+  await session.write("printf 'shared-wait-ok\\n'");
+  await Promise.all([first, second]);
+  session.close();
+});
+
+test("waitForText reports a stable timeout error", async () => {
+  const session = await TerminalSession.create({ shell: "/bin/sh", cols: 40, rows: 5 });
+
+  await expect(session.waitForText("text-that-will-not-appear", 10)).rejects.toThrow(
+    "Timed out waiting for text: text-that-will-not-appear",
+  );
+  session.close();
+});
+
+test("sendKey works immediately for an interactive process", async () => {
+  const session = await TerminalSession.create({ command: "cat", cols: 40, rows: 5 });
+
+  await session.write("key-input");
+  await session.sendKey("ENTER");
+  await session.waitForText("key-input", 2000);
+  session.close();
+});
+
+test("concurrent REST typing keeps each submitted line intact", async () => {
+  const manager = new TerminalManager();
+  const session = await manager.create({
+    command: "/bin/sh",
+    args: ["-c", "stty -echo; printf 'ready\n'; while IFS= read -r line; do printf '<%s>\n' \"$line\"; done"],
+    cols: 80,
+    rows: 12,
+  });
+  const server = createRestServer(manager, 0);
+  const base = `http://${server.hostname}:${server.port}`;
+
+  try {
+    await session.waitForText("ready", 2000);
+    const responses = await Promise.all(
+      ["first-atomic-line", "second-atomic-line"].map((text) =>
+        fetch(`${base}/sessions/${session.id}/type`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, submit: true }),
+        }),
+      ),
+    );
+
+    expect(responses.every((response) => response.status === 200)).toBe(true);
+    await session.waitForText("<first-atomic-line>", 2000);
+    await session.waitForText("<second-atomic-line>", 2000);
+    expect(session.snapshot("text").text).not.toContain("<first-atomic-linesecond-atomic-line>");
+    expect(session.snapshot("text").text).not.toContain("<second-atomic-linefirst-atomic-line>");
+  } finally {
+    session.close();
+    server.stop();
+  }
+});
+
 test("manager, redaction, and MCP share the contract", async () => {
   const m = new TerminalManager();
   const result = await handleMcp({ method: "health" }, m);

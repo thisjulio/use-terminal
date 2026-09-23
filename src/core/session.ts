@@ -23,12 +23,19 @@ export class TerminalSession {
   private exitCode?: number;
   private eventsQueue: TerminalEvent[] = [];
   private waiters: ((event: TerminalEvent) => void)[] = [];
+  private screenWaiters: Array<{
+    text: string;
+    resolve: () => void;
+    reject: (error: Error) => void;
+    timer: ReturnType<typeof setTimeout>;
+  }> = [];
   private proc?: ReturnType<typeof spawnPty>;
   private readonly cwd: string;
   private readonly shell: string;
   private readonly command?: string;
   private readonly args: string[];
   private readonly headed: boolean;
+  private inputTail: Promise<void> = Promise.resolve();
   private terminalQueryBuffer = "";
   private mouseSgrEnabled = false;
   private mouseModeBuffer = "";
@@ -69,7 +76,16 @@ export class TerminalSession {
       this.respondToTerminalQueries(data);
       this.emit({ type: "data", data });
     });
-    this.emulator.onChange(() => this.emit({ type: "screen", snapshot: this.snapshot("text") }));
+    this.emulator.onChange(() => {
+      const snapshot = this.snapshot("text");
+      this.emit({ type: "screen", snapshot });
+      for (const waiter of [...this.screenWaiters]) {
+        if (!snapshot.text?.includes(waiter.text)) continue;
+        clearTimeout(waiter.timer);
+        this.screenWaiters.splice(this.screenWaiters.indexOf(waiter), 1);
+        waiter.resolve();
+      }
+    });
     this.proc.onExit(({ exitCode }) => {
       this.status = "exited";
       this.exitCode = exitCode;
@@ -119,8 +135,19 @@ export class TerminalSession {
     };
   }
   async write(data: string | Uint8Array): Promise<void> {
-    if (!this.proc) throw new Error("session not started");
-    this.proc.write(typeof data === "string" ? data : new TextDecoder().decode(data));
+    const text = typeof data === "string" ? data : new TextDecoder().decode(data);
+    const write = this.inputTail.then(() => {
+      if (!this.proc) throw new Error("session not started");
+      this.proc.write(text);
+    });
+    this.inputTail = write.then(
+      () => undefined,
+      () => undefined,
+    );
+    await write;
+  }
+  async type(text: string, submit = false): Promise<void> {
+    await this.write(`${text}${submit ? "\r" : ""}`);
   }
   async sendKey(key: Key): Promise<void> {
     await this.write(keySequences[key]);
@@ -248,24 +275,45 @@ export class TerminalSession {
 
   async waitForText(text: string, timeout = 10000): Promise<void> {
     if (this.snapshot("text").text?.includes(text)) return;
-    const end = Date.now() + timeout;
-    while (Date.now() < end) {
-      const event = await this.nextEvent(Math.max(1, end - Date.now()));
-      if (event.type === "screen" && event.snapshot?.text?.includes(text)) return;
-    }
-    throw new Error(`Timed out waiting for text: ${text}`);
+    await new Promise<void>((resolve, reject) => {
+      const waiter = {
+        text,
+        resolve: () => {
+          this.screenWaiters.splice(this.screenWaiters.indexOf(waiter), 1);
+          resolve();
+        },
+        reject: (error: Error) => {
+          this.screenWaiters.splice(this.screenWaiters.indexOf(waiter), 1);
+          reject(error);
+        },
+        timer: undefined as unknown as ReturnType<typeof setTimeout>,
+      };
+      waiter.timer = setTimeout(
+        () => {
+          waiter.reject(new Error(`Timed out waiting for text: ${text}`));
+        },
+        Math.max(0, timeout),
+      );
+      this.screenWaiters.push(waiter);
+    });
   }
 
   private nextEvent(timeout: number): Promise<TerminalEvent> {
     if (this.eventsQueue.length) return Promise.resolve(this.eventsQueue.shift()!);
     return new Promise((resolve, reject) => {
+      let waiter: (event: TerminalEvent) => void;
       const timer = Number.isFinite(timeout)
-        ? setTimeout(() => reject(new Error("event timeout")), timeout)
+        ? setTimeout(() => {
+            const index = this.waiters.indexOf(waiter);
+            if (index >= 0) this.waiters.splice(index, 1);
+            reject(new Error("event timeout"));
+          }, timeout)
         : undefined;
-      this.waiters.push((event) => {
+      waiter = (event) => {
         if (timer) clearTimeout(timer);
         resolve(event);
-      });
+      };
+      this.waiters.push(waiter);
     });
   }
 

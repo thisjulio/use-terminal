@@ -353,8 +353,7 @@ async function handleRequest(request: Request, manager: TerminalManager): Promis
   if (match[2] === "type" && request.method === "POST") {
     const body = (await request.json()) as { text: string; submit?: boolean };
     if (typeof body.text !== "string") return Response.json({ error: "text is required" }, { status: 400 });
-    await session.write(body.text);
-    if (body.submit) await session.write("\r");
+    await session.type(body.text, Boolean(body.submit));
     return Response.json({ ok: true });
   }
   if (match[2] === "mouse" && request.method === "POST") {

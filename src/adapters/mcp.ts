@@ -84,8 +84,7 @@ async function callTool(name: string, args: Record<string, unknown>, manager: Te
     case "sessions_type":
       return sessionOf(async (session) => {
         const text = String(args.text ?? "");
-        await session.write(text);
-        if (args.submit) await session.write("\r");
+        await session.type(text, Boolean(args.submit));
         return { ok: true };
       });
     case "sessions_mouse":
