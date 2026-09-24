@@ -54,9 +54,7 @@ function inlineComponentRefs(value: unknown, resolving = new Set<string>()): unk
     return inlineComponentRefs({ ...schema, ...siblings }, nextResolving);
   }
 
-  return Object.fromEntries(
-    Object.entries(object).map(([key, child]) => [key, inlineComponentRefs(child, resolving)]),
-  );
+  return Object.fromEntries(Object.entries(object).map(([key, child]) => [key, inlineComponentRefs(child, resolving)]));
 }
 
 function toolResult(value: unknown): { content: { type: "text"; text: string }[]; isError?: boolean } {
