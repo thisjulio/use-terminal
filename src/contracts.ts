@@ -659,41 +659,6 @@ export const ROUTES: RestRoute[] = [
     ],
   },
   {
-    id: "session_wait_change",
-    path: "/sessions/{id}/wait/change",
-    method: "POST",
-    summary: "Wait for any screen change (high-level)",
-    description: "Waits until the visible screen changes after the call or the timeout expires (MCP default: 5000 ms).",
-    tags: ["sessions"],
-    pathParams: [{ name: "id", description: "Session ID" }],
-    requestBody: {
-      type: "object",
-      properties: { timeoutMs: { type: "integer", description: "Default: 10000" } },
-    },
-    mcpTool: {
-      name: "sessions_wait_change",
-      description:
-        "Waits, with a timeout, for the screen to change. Useful for TUIs and prompts without a known text string. The MCP default is 5000 ms to avoid client request deadline races.",
-      inputSchema: {
-        type: "object",
-        properties: {
-          sessionId: { type: "string" },
-          timeoutMs: {
-            type: "integer",
-            description: "Default: 5000 for MCP; use a shorter value when the client has a strict request deadline.",
-          },
-        },
-        required: ["sessionId"],
-        additionalProperties: false,
-      },
-    },
-    responses: [
-      { status: 200, description: "Screen changed", schema: OK_SCHEMA },
-      { status: 504, description: "Timeout waiting for screen change", schema: { $ref: "#/components/schemas/Error" } },
-      { status: 404, description: "Session not found", schema: { $ref: "#/components/schemas/Error" } },
-    ],
-  },
-  {
     id: "session_events",
     path: "/sessions/{id}/events",
     method: "GET",

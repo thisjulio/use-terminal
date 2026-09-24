@@ -302,53 +302,6 @@ describe("MCP/REST/OpenAPI contracts", () => {
     server.stop();
   }, 30000);
 
-  test("REST/MCP parity: wait/change resolves on change and times out idle", async () => {
-    const manager = new TerminalManager();
-    const session = await manager.create({ shell: "/bin/sh", cols: 40, rows: 10 });
-    const server = createRestServer(manager, 0);
-    const base = `http://${server.hostname}:${server.port}`;
-    const id = session.id;
-
-    await session.waitForText("$", 5000);
-
-    // A real change: type a command, then the REST wait/change must resolve.
-    await session.type("printf 'wait-change-ok\\n'", true);
-    const changed = await fetch(`${base}/sessions/${id}/wait/change`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ timeoutMs: 5000 }),
-    });
-    expect(changed.status).toBe(200);
-    expect(await changed.json()).toEqual({ ok: true });
-
-    // Idle: nothing changes, so the REST wait/change must time out with 504.
-    const idle = await fetch(`${base}/sessions/${id}/wait/change`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ timeoutMs: 100 }),
-    });
-    expect(idle.status).toBe(504);
-    expect(((await idle.json()) as { error: string }).error).toContain("Timed out");
-
-    // MCP parity: the same operation is callable through the MCP adapter and
-    // surfaces the idle timeout as a tool error (isError).
-    const mcp = await handleMcpMessage(
-      {
-        jsonrpc: "2.0",
-        id: 7,
-        method: "tools/call",
-        params: { name: "sessions_wait_change", arguments: { sessionId: id, timeoutMs: 100 } },
-      },
-      manager,
-    );
-    expect(mcp).not.toBeNull();
-    const mcpResult = mcp as { result?: { content: { text: string }[]; isError?: boolean } };
-    expect(mcpResult.result!.isError).toBe(true);
-    expect(mcpResult.result!.content[0]!.text).toContain("Timed out");
-    session.close();
-    server.stop();
-  }, 30000);
-
   test("REST/MCP parity: /key named keys and /action", async () => {
     const manager = new TerminalManager();
     const session = await manager.create({ shell: "/bin/sh", cols: 40, rows: 10 });
