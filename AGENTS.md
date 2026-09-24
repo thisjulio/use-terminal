@@ -12,6 +12,33 @@ use-terminal is interactive terminal infrastructure for LLM agents. The product 
 
 Documentation may describe future targets. Do not present a capability as implemented without code and tests that prove it.
 
+## Development commands
+
+The project uses Bun and strict TypeScript. Install the locked dependencies with:
+
+```bash
+bun install --frozen-lockfile
+```
+
+Commands used by Linux CI are:
+
+```bash
+bun run lint
+bun run typecheck
+bun test
+```
+
+The combined local check is `bun run check`. Run one test file with `bun test path/to/file.test.ts`; the repository's test files are `index.test.ts`, `tests/*.test.ts`, and `src/core/*.test.ts`. The executable entrypoint is `bun run index.ts`; use `bun run mcp` for the source MCP server and `bun run serve` for the REST server. `bun run format` rewrites files with Biome, so use it deliberately.
+
+## Repository layout
+
+- `index.ts` and `src/types.ts` expose the package entrypoint and public types.
+- `src/core/` contains the session manager, PTY/session implementation, emulator, snapshots, keys, mouse, and semantic layer.
+- `src/contracts.ts` and `src/adapters/` contain shared contracts plus REST, OpenAPI, and MCP adapters.
+- `bin/` contains the published MCP launcher; `scripts/` contains the REST server and live viewer.
+- `index.test.ts`, `src/**/*.test.ts`, and `tests/*.test.ts` contain automated tests. `tests/manual/` and `tests/diagnostics/` are excluded from TypeScript checking and are for manual/debug workflows.
+- `PRODUCT.md` and `ROADMAP.md` describe product boundaries and delivery phases; `.github/workflows/ci.yml` defines the verification baseline.
+
 ## Implementation principles
 
 - Preserve the separation between the PTY backend, session, emulator, snapshots, events, and adapters.
