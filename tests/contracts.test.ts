@@ -427,6 +427,10 @@ describe("MCP/REST/OpenAPI contracts", () => {
     const base = `http://${server.hostname}:${server.port}`;
     const id = session.id;
 
+    // Wait for the shell prompt before typing; without this the bytes can be
+    // written before the shell is ready to read, which is racy on slower CI.
+    await session.waitForText("$", 5000);
+
     await session.type("printf 'select-parity\n'", true);
     // Poll the raw snapshot until the exact output line appears. waitForText is
     // not sufficient here because the command echo also contains the substring
