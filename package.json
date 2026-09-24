@@ -1,6 +1,6 @@
 {
   "name": "use-terminal",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Observable and programmable PTY terminal for LLM agents",
   "license": "MIT",
   "bin": {

@@ -171,7 +171,10 @@ async function callTool(name: string, args: Record<string, unknown>, manager: Te
       });
     case "sessions_wait_change":
       return sessionOf(async (session) => {
-        const timeoutMs = Number(args.timeoutMs ?? 10000);
+        // Keep the implicit MCP request below common client-side request
+        // deadlines. A ten-second tool default races with those deadlines and
+        // surfaces as transport error -32001 instead of a tool timeout.
+        const timeoutMs = Number(args.timeoutMs ?? 5000);
         await session.waitForScreenChange(timeoutMs);
         return { ok: true };
       });

@@ -148,9 +148,12 @@ export class TerminalEmulator {
         this.newLine();
         changed = true;
       } else if (char === "\r") {
+        if (this.x !== 0) changed = true;
         this.x = 0;
       } else if (char === "\b") {
-        this.x = Math.max(0, this.x - 1);
+        const nextX = Math.max(0, this.x - 1);
+        if (nextX !== this.x) changed = true;
+        this.x = nextX;
       } else if (char >= " ") {
         this.put(char);
         changed = true;

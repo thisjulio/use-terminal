@@ -36,10 +36,12 @@ export class TerminalSession {
     timer: ReturnType<typeof setTimeout>;
   }> = [];
   private screenChangeWaiters: Array<{
+    version: number;
     resolve: () => void;
     reject: (error: Error) => void;
     timer: ReturnType<typeof setTimeout>;
   }> = [];
+  private screenVersion = 0;
   private proc?: ReturnType<typeof spawnPty>;
   private readonly cwd: string;
   private readonly shell: string;
@@ -88,6 +90,7 @@ export class TerminalSession {
       this.emit({ type: "data", data });
     });
     this.emulator.onChange(() => {
+      this.screenVersion++;
       const snapshot = this.snapshot("text");
       this.emit({ type: "screen", snapshot });
       for (const waiter of [...this.screenWaiters]) {
@@ -96,10 +99,9 @@ export class TerminalSession {
         waiter.resolve();
       }
       for (const waiter of [...this.screenChangeWaiters]) {
-        clearTimeout(waiter.timer);
+        if (this.screenVersion <= waiter.version) continue;
         waiter.resolve();
       }
-      this.screenChangeWaiters = [];
     });
     this.proc.onExit(({ exitCode }) => {
       this.status = "exited";
@@ -413,10 +415,23 @@ export class TerminalSession {
    */
   async waitForScreenChange(timeout = 10000): Promise<void> {
     if (this.status !== "running") throw new Error("Session is not running");
+    const initialVersion = this.screenVersion;
     await new Promise<void>((resolve, reject) => {
+      let settled = false;
       const waiter = {
-        resolve: () => resolve(),
+        version: initialVersion,
+        resolve: () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(waiter.timer);
+          const index = this.screenChangeWaiters.indexOf(waiter);
+          if (index >= 0) this.screenChangeWaiters.splice(index, 1);
+          resolve();
+        },
         reject: (error: Error) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(waiter.timer);
           const index = this.screenChangeWaiters.indexOf(waiter);
           if (index >= 0) this.screenChangeWaiters.splice(index, 1);
           reject(error);
@@ -425,13 +440,12 @@ export class TerminalSession {
       };
       waiter.timer = setTimeout(
         () => {
-          const index = this.screenChangeWaiters.indexOf(waiter);
-          if (index >= 0) this.screenChangeWaiters.splice(index, 1);
-          reject(new Error(`Timed out waiting for screen change`));
+          waiter.reject(new Error(`Timed out waiting for screen change`));
         },
         Math.max(0, timeout),
       );
       this.screenChangeWaiters.push(waiter);
+      if (this.screenVersion > initialVersion) waiter.resolve();
     });
   }
 

@@ -663,7 +663,7 @@ export const ROUTES: RestRoute[] = [
     path: "/sessions/{id}/wait/change",
     method: "POST",
     summary: "Wait for any screen change (high-level)",
-    description: "Waits until the visible screen changes after the call or the timeout expires.",
+    description: "Waits until the visible screen changes after the call or the timeout expires (MCP default: 5000 ms).",
     tags: ["sessions"],
     pathParams: [{ name: "id", description: "Session ID" }],
     requestBody: {
@@ -673,10 +673,16 @@ export const ROUTES: RestRoute[] = [
     mcpTool: {
       name: "sessions_wait_change",
       description:
-        "Waits, with a timeout, for the screen to change. Useful for TUIs and prompts without a known text string.",
+        "Waits, with a timeout, for the screen to change. Useful for TUIs and prompts without a known text string. The MCP default is 5000 ms to avoid client request deadline races.",
       inputSchema: {
         type: "object",
-        properties: { sessionId: { type: "string" }, timeoutMs: { type: "integer" } },
+        properties: {
+          sessionId: { type: "string" },
+          timeoutMs: {
+            type: "integer",
+            description: "Default: 5000 for MCP; use a shorter value when the client has a strict request deadline.",
+          },
+        },
         required: ["sessionId"],
         additionalProperties: false,
       },
