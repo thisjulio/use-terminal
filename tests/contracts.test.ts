@@ -428,23 +428,28 @@ describe("MCP/REST/OpenAPI contracts", () => {
     const id = session.id;
 
     await session.type("printf 'select-parity\n'", true);
-    await session.waitForText("select-parity", 5000);
-
-    // Locate the absolute row of the output so the selection is deterministic
-    // regardless of how much prompt scrollback exists. Absolute row 0 is the
-    // oldest (top of scrollback); the visible rows are the last `rows` rows.
-    const raw = session.snapshot("raw");
-    const visibleOffset = (raw.viewport?.totalRows ?? 0) - raw.rows;
-    // Match the output line exactly (trimmed), not the typed command line that
-    // also contains the substring.
-    const visibleRow = (raw.cells ?? []).findIndex(
-      (line) =>
-        line
-          .map((cell) => cell.char)
-          .join("")
-          .trim() === "select-parity",
-    );
+    // Poll the raw snapshot until the exact output line appears. waitForText is
+    // not sufficient here because the command echo also contains the substring
+    // "select-parity"; we need to wait for the *output* line to render.
+    const deadline = Date.now() + 5000;
+    let visibleRow = -1;
+    let raw = session.snapshot("raw");
+    while (Date.now() < deadline) {
+      visibleRow = (raw.cells ?? []).findIndex(
+        (line) =>
+          line
+            .map((cell) => cell.char)
+            .join("")
+            .trim() === "select-parity",
+      );
+      if (visibleRow >= 0) break;
+      await new Promise((r) => setTimeout(r, 25));
+      raw = session.snapshot("raw");
+    }
     expect(visibleRow).toBeGreaterThanOrEqual(0);
+    // Absolute row 0 is the oldest (top of scrollback); the visible rows are
+    // the last `rows` rows.
+    const visibleOffset = (raw.viewport?.totalRows ?? 0) - raw.rows;
     const absRow = visibleOffset + visibleRow;
 
     const select = await fetch(`${base}/sessions/${id}/select`, {
