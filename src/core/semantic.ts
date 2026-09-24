@@ -132,6 +132,13 @@ function looksLikeTableRow(text: string): boolean {
 
 /**
  * Suggests possible actions based on the current semantic state.
+ *
+ * Prompt nodes emit actions from the executable vocabulary (the ids accepted
+ * by `TerminalSession.performAction`) so the suggested action is directly
+ * runnable: a prompt suggests `type`, executed as `performAction("type", { text })`.
+ * The `input` field carries the suggested text (empty when there is none).
+ * Non-executable suggestions (such as `investigate-error`) stay descriptive:
+ * they do not map to bytes.
  */
 export function suggestActions(tree: SemanticNode): SemanticAction[] {
   const actions: SemanticAction[] = [];
@@ -139,9 +146,10 @@ export function suggestActions(tree: SemanticNode): SemanticAction[] {
   function walk(node: SemanticNode) {
     if (node.role === "prompt" && node.text) {
       actions.push({
-        id: "continue-at-prompt",
+        id: "type",
         label: "Type at prompt",
         description: "Enter a command at the shell prompt",
+        input: "",
         confidence: 0.9,
       });
     }

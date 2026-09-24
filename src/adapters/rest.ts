@@ -1,3 +1,4 @@
+import { isMappedKey } from "../core/keys";
 import { TerminalManager } from "../core/manager";
 import type { SessionOptions, Snapshot, TerminalEvent, MouseEvent as TerminalMouseEvent } from "../types";
 import { buildOpenApiDocument, SWAGGER_HTML } from "./openapi";
@@ -308,7 +309,7 @@ async function handleRequest(request: Request, manager: TerminalManager): Promis
     return Response.json((await manager.create((await request.json()) as SessionOptions)).info(), { status: 201 });
   if (url.pathname === "/sessions" && request.method === "GET") return Response.json(manager.list());
   const match = url.pathname.match(
-    /^\/sessions\/([^/]+)(?:\/(snapshot|screenshot|input|key|type|mouse|drag|viewport|wait|events|signal|resize|clipboard\/copy|clipboard\/paste|stream|close|viewer|ws))?$/,
+    /^\/sessions\/([^/]+)(?:\/(snapshot|screenshot|input|key|type|action|mouse|drag|viewport|wait\/change|wait|events|signal|resize|clipboard\/copy|clipboard\/paste|select|selection\/clear|selection\/copy|selection\/paste|selection|stream|close|viewer|ws))?$/,
   );
   if (!match) return new Response("Not found", { status: 404 });
   const session = manager.get(match[1]!);
@@ -345,9 +346,15 @@ async function handleRequest(request: Request, manager: TerminalManager): Promis
   if (match[2] === "key" && request.method === "POST") {
     const body = (await request.json()) as { key: string };
     const key = body.key;
-    if (!["ENTER", "TAB", "CTRL_C", "CTRL_D", "CTRL_Z"].includes(key))
-      return Response.json({ error: "key must be ENTER, TAB, CTRL_C, CTRL_D or CTRL_Z" }, { status: 400 });
-    await session.sendKey(key as Parameters<typeof session.sendKey>[0]);
+    if (!isMappedKey(key))
+      return Response.json(
+        {
+          error:
+            "key must be a control key (ENTER, TAB, CTRL_C, CTRL_D, CTRL_Z) or a named key (arrows, function keys, Home/End, PageUp/Down, ESC, Backspace, Insert/Delete)",
+        },
+        { status: 400 },
+      );
+    await session.sendMappedKey(key);
     return Response.json({ ok: true });
   }
   if (match[2] === "type" && request.method === "POST") {
@@ -355,6 +362,16 @@ async function handleRequest(request: Request, manager: TerminalManager): Promis
     if (typeof body.text !== "string") return Response.json({ error: "text is required" }, { status: 400 });
     await session.type(body.text, Boolean(body.submit));
     return Response.json({ ok: true });
+  }
+  if (match[2] === "action" && request.method === "POST") {
+    const body = (await request.json()) as { id: string; key?: string; text?: string; submit?: boolean };
+    if (typeof body.id !== "string" || !body.id) return Response.json({ error: "id is required" }, { status: 400 });
+    try {
+      await session.performAction(body.id, { key: body.key, text: body.text, submit: Boolean(body.submit) });
+      return Response.json({ ok: true });
+    } catch (error) {
+      return Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
+    }
   }
   if (match[2] === "mouse" && request.method === "POST") {
     const event = (await request.json()) as TerminalMouseEvent;
@@ -390,6 +407,25 @@ async function handleRequest(request: Request, manager: TerminalManager): Promis
     await session.pasteFromClipboard();
     return Response.json({ ok: true, pasted: true });
   }
+  if (match[2] === "select" && request.method === "POST") {
+    const body = (await request.json()) as { from: { x: number; y: number }; to: { x: number; y: number } };
+    session.select(body.from, body.to);
+    return Response.json(session.emulator.getSelection());
+  }
+  if (match[2] === "selection/clear" && request.method === "POST") {
+    session.clearSelection();
+    return Response.json({ ok: true });
+  }
+  if (match[2] === "selection" && request.method === "GET") {
+    return Response.json({ text: session.selectedText() });
+  }
+  if (match[2] === "selection/copy" && request.method === "POST") {
+    return Response.json({ ok: true, copied: await session.copySelectionToClipboard() });
+  }
+  if (match[2] === "selection/paste" && request.method === "POST") {
+    await session.pasteSelection();
+    return Response.json({ ok: true });
+  }
   if (match[2] === "viewport" && request.method === "POST") {
     const body = (await request.json()) as { offset?: number; delta?: number };
     if (body.delta !== undefined) session.scrollViewport(body.delta);
@@ -402,6 +438,15 @@ async function handleRequest(request: Request, manager: TerminalManager): Promis
     try {
       await session.waitForText(body.text, body.timeoutMs ?? 10000);
       return Response.json({ ok: true, text: body.text });
+    } catch (error) {
+      return Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: 504 });
+    }
+  }
+  if (match[2] === "wait/change" && request.method === "POST") {
+    const body = (await request.json()) as { timeoutMs?: number };
+    try {
+      await session.waitForScreenChange(body.timeoutMs ?? 10000);
+      return Response.json({ ok: true });
     } catch (error) {
       return Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: 504 });
     }

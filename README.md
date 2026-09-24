@@ -4,7 +4,7 @@
 
 **use-terminal** gives an agent a real, programmable terminal session—not just an isolated `bash` call. The goal is to reproduce, over a real PTY, the capabilities relevant to a human terminal: low-level input, VT/ANSI emulation, scrollback, viewport, selection, clipboard, mouse, TUIs, and observable snapshots. The same core should provide a low-level API for precise control and a high-level API for automation, exposed consistently through the package, REST, and MCP.
 
-> **Current status:** the executable core already has persistent sessions over a real PTY, a basic ANSI emulator, snapshots, and REST/MCP adapters. Full compatibility with real terminals, including scrollback, viewport, selection, and all VT/ANSI modes, remains an evolving goal and must not be assumed to be implemented.
+> **Current status:** the executable core has persistent sessions over a real PTY, a VT/ANSI emulator with scrollback, viewport, alternate screen, cell/multiline selection, and snapshots (textual, raw, and semantic), plus REST and MCP adapters with a low-level and high-level API, all covered by tests. What remains planned is the full VT/ANSI compatibility matrix; it must not be assumed to be implemented.
 
 ## Why not just a bash tool?
 
@@ -21,7 +21,7 @@ use-terminal treats the terminal as a live session with state and events.
 
 ## Positioning
 
-Other tools already explore providing PTYs, persistent sessions, and TUI automation for agents. use-terminal aims to differentiate itself through the combination of a real PTY, observable screen state, snapshots at different representation levels, and a shared contract across the package, REST, and MCP. The future semantic layer will be heuristic and must preserve the raw snapshot as the source of truth.
+Other tools already explore providing PTYs, persistent sessions, and TUI automation for agents. use-terminal aims to differentiate itself through the combination of a real PTY, observable screen state, snapshots at different representation levels, and a shared contract across the package, REST, and MCP. The semantic layer is heuristic and preserves the raw snapshot as the source of truth.
 
 ## Product direction
 
@@ -46,7 +46,7 @@ Other tools already explore providing PTYs, persistent sessions, and TUI automat
 - waiting for text or screen changes;
 - mouse and clipboard;
 - a low-level API for bytes, sequences, events, snapshots, and PTY control;
-- a high-level API for `type`, keys, clicks, scrolling, selection, clipboard, waiting for text/changes, and semantic actions;
+- a high-level API for `type`, `pressKey` (named keys: arrows, function keys, Home/End, PageUp/Down, ESC, Backspace, Insert/Delete), `performAction` (deterministic semantic actions `type` and `press-key`), clicks, scrolling, selection, clipboard, waiting for text/changes, and semantic actions;
 - local REST with SSE and MCP stdio, using shared TypeScript schemas and parity between both APIs;
 - structured logs with redaction of known secret patterns.
 
@@ -54,7 +54,7 @@ Semantic snapshots will be heuristic. The raw snapshot remains the source of tru
 
 ## Intended API example
 
-The API below is illustrative and is not yet available:
+The API below is available through the npm package:
 
 ```ts
 import { TerminalSession } from "use-terminal";
@@ -69,8 +69,8 @@ const terminal = await TerminalSession.create({
 await terminal.write("printf 'ready\\n'");
 await terminal.waitForText("ready");
 
-console.log(terminal.snapshot({ mode: "text" }));
-console.log(terminal.snapshot({ mode: "raw" }));
+console.log(terminal.snapshot("text"));
+console.log(terminal.snapshot("raw"));
 
 for await (const event of terminal.events()) {
   // bytes, screen changes, or semantic events
@@ -190,7 +190,7 @@ Claude Code passes everything after `--` to the stdio server launcher. Do not om
 After the client connects, it should call `initialize` and `tools/list`. The server advertises these tools:
 
 - `sessions_list`, `sessions_create`, `sessions_info`, `sessions_snapshot`;
-- `sessions_input`, `sessions_type`, `sessions_key`, `sessions_wait`, `sessions_events`;
+- `sessions_input`, `sessions_type`, `sessions_key`, `sessions_action`, `sessions_wait`, `sessions_events`;
 - `sessions_mouse`, `sessions_drag`, `sessions_viewport`, `sessions_resize`;
 - `sessions_screenshot`, `sessions_signal`, `sessions_close`;
 - `sessions_clipboard_copy`, `sessions_clipboard_paste`.
@@ -228,11 +228,15 @@ use-terminal is a privileged tool, not a sandbox. A session can start a configur
 | --- | --- |
 | Discovery and product vision | ✅ complete |
 | Specification and roadmap | ✅ complete |
-| PTY/session package | 🧭 planned |
-| VT/ANSI emulator and snapshots | 🧭 planned |
-| Localhost REST | 🧭 planned |
+| PTY/session package | ✅ implemented |
+| VT/ANSI emulator and snapshots | ✅ implemented |
+| Localhost REST | ✅ implemented |
 | MCP stdio | ✅ implemented |
-| Semantic tree, mouse, and clipboard | 🧭 planned |
+| Semantic tree, mouse, and clipboard | ✅ implemented |
+| Full VT/ANSI compatibility matrix | 🧭 planned |
+| Cell/multiline selection with auto-scroll | ✅ implemented |
+| Low/high-level API separation and parity | ✅ implemented |
+| Security, sandboxing, and distribution | 🧭 planned |
 
 See the [complete roadmap](./ROADMAP.md).
 

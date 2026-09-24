@@ -1,5 +1,6 @@
 import { Buffer } from "node:buffer";
 import { COMPONENT_SCHEMAS, MCP_TOOL_NAMES, ROUTES } from "../contracts";
+import { isMappedKey } from "../core/keys";
 import { TerminalManager } from "../core/manager";
 import type { TerminalSession } from "../core/session";
 import type { SessionOptions, SignalName, Snapshot, MouseEvent as TerminalMouseEvent } from "../types";
@@ -113,16 +114,28 @@ async function callTool(name: string, args: Record<string, unknown>, manager: Te
       });
     case "sessions_key":
       return sessionOf(async (session) => {
-        const key = args.key as string;
-        if (!["ENTER", "TAB", "CTRL_C", "CTRL_D", "CTRL_Z"].includes(key))
-          throw new Error("key must be ENTER, TAB, CTRL_C, CTRL_D or CTRL_Z");
-        await session.sendKey(key as Parameters<typeof session.sendKey>[0]);
+        const key = String(args.key ?? "");
+        if (!isMappedKey(key))
+          throw new Error(
+            "key must be a control key (ENTER, TAB, CTRL_C, CTRL_D, CTRL_Z) or a named key (arrows, function keys, Home/End, PageUp/Down, ESC, Backspace, Insert/Delete)",
+          );
+        await session.sendMappedKey(key);
         return { ok: true };
       });
     case "sessions_type":
       return sessionOf(async (session) => {
         const text = String(args.text ?? "");
         await session.type(text, Boolean(args.submit));
+        return { ok: true };
+      });
+    case "sessions_action":
+      return sessionOf(async (session) => {
+        const id = String(args.id ?? "");
+        await session.performAction(id, {
+          key: args.key as string | undefined,
+          text: args.text as string | undefined,
+          submit: Boolean(args.submit),
+        });
         return { ok: true };
       });
     case "sessions_mouse":
@@ -156,6 +169,12 @@ async function callTool(name: string, args: Record<string, unknown>, manager: Te
         await session.waitForText(text, timeoutMs);
         return { ok: true, text };
       });
+    case "sessions_wait_change":
+      return sessionOf(async (session) => {
+        const timeoutMs = Number(args.timeoutMs ?? 10000);
+        await session.waitForScreenChange(timeoutMs);
+        return { ok: true };
+      });
     case "sessions_events":
       return sessionOf((session) =>
         session.collectEvents(Number(args.maxEvents ?? 50), Number(args.timeoutMs ?? 2000)),
@@ -181,6 +200,25 @@ async function callTool(name: string, args: Record<string, unknown>, manager: Te
       return sessionOf(async (session) => {
         await session.pasteFromClipboard();
         return { ok: true, pasted: true };
+      });
+    case "sessions_select":
+      return sessionOf((session) => {
+        const { from, to } = args as { from: { x: number; y: number }; to: { x: number; y: number } };
+        return session.select(from, to);
+      });
+    case "sessions_clear_selection":
+      return sessionOf((session) => {
+        session.clearSelection();
+        return { ok: true };
+      });
+    case "sessions_selection_text":
+      return sessionOf((session) => ({ text: session.selectedText() }));
+    case "sessions_selection_copy":
+      return sessionOf(async (session) => ({ ok: true, copied: await session.copySelectionToClipboard() }));
+    case "sessions_selection_paste":
+      return sessionOf(async (session) => {
+        await session.pasteSelection();
+        return { ok: true };
       });
     case "sessions_close":
       return sessionOf((session) => {

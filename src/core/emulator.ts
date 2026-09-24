@@ -1,4 +1,4 @@
-import type { Cell, Snapshot, TerminalColor } from "../types";
+import type { Cell, Selection, SelectionPoint, Snapshot, TerminalColor } from "../types";
 import { parseSemantic, suggestActions } from "./semantic";
 
 const defaultColor: TerminalColor = { type: "default" };
@@ -39,6 +39,9 @@ export class TerminalEmulator {
   private escapeBuffer = "";
   private savedX?: number;
   private savedY?: number;
+  private selection?: Selection;
+  private activeHyperlink?: string;
+  private readonly modes = new Map<string, boolean>();
 
   constructor(
     public cols = 80,
@@ -79,6 +82,7 @@ export class TerminalEmulator {
       dim: this.dim,
       italic: this.italic,
       strike: this.strike,
+      hyperlink: this.activeHyperlink,
     };
     this.x++;
   }
@@ -110,6 +114,17 @@ export class TerminalEmulator {
         const singleEscape = remainder.match(/^\x1b([=>78])/);
         if (singleEscape) {
           index += singleEscape[0].length;
+          continue;
+        }
+        // OSC 8 hyperlinks, handled as two tokens so the linked text can flow
+        // through normal writes (it may arrive in separate chunks):
+        //   open:  \x1b]8;{url}\x1b\\   -> set activeHyperlink
+        //   close: \x1b]8;\x1b\\          -> clear activeHyperlink
+        const hyperlinkToken = remainder.match(/^\x1b\]8;([^\x1b]*)(\x1b\\|\x07)/);
+        if (hyperlinkToken) {
+          const url = hyperlinkToken[1]!;
+          this.activeHyperlink = url || undefined;
+          index += hyperlinkToken[0].length;
           continue;
         }
         // OSC and DCS sequences must be consumed, otherwise an unsupported
@@ -182,6 +197,9 @@ export class TerminalEmulator {
         // Show/hide cursor
         this.cursorVisible = code === "h";
       }
+      // Record private modes (bracketed paste, focus, mouse, alternate, etc.)
+      // so the snapshot can expose what was negotiated with the application.
+      for (const mode of requested) this.modes.set(String(mode), code === "h");
       return;
     }
 
@@ -375,6 +393,66 @@ export class TerminalEmulator {
     return { offset: this.viewportOffset, height: this.rows, totalRows: this.history.length + this.rows };
   }
 
+  /**
+   * Selection uses absolute row coordinates (0 = top of scrollback), matching
+   * the viewer's pointer math. Visible cells are the last `rows` of the buffer,
+   * so absolute row `r` maps to visible row `r - (totalRows - rows)`.
+   */
+  select(from: SelectionPoint, to: SelectionPoint): Selection {
+    const totalRows = this.history.length + this.rows;
+    const clamp = (point: SelectionPoint) => ({
+      x: Math.max(0, Math.min(this.cols - 1, point.x)),
+      y: Math.max(0, Math.min(totalRows - 1, point.y)),
+    });
+    const start = clamp(from);
+    const end = clamp(to);
+    this.selection = { start, end };
+    return this.selection;
+  }
+
+  clearSelection(): void {
+    this.selection = undefined;
+  }
+
+  getSelection(): Selection | undefined {
+    return this.selection;
+  }
+
+  /**
+   * Returns whether a private mode was negotiated with the application.
+   * Examples: "2026" (bracketed paste), "1004" (focus reporting), "1006" (SGR mouse),
+   * "2004" (bracketed paste, alternate), "1049" (alternate screen).
+   */
+  isModeEnabled(mode: string): boolean {
+    return this.modes.get(mode) === true;
+  }
+
+  /**
+   * Returns the text spanning the current selection across the full buffer
+   * (scrollback + visible rows). The selection is clamped to the buffer.
+   */
+  selectedText(): string {
+    if (!this.selection) return "";
+    const rows = [...this.history, ...this.cells];
+    const { start, end } = this.selection;
+    const first = start.y < end.y || (start.y === end.y && start.x <= end.x) ? start : end;
+    const last = first === start ? end : start;
+    const lines: string[] = [];
+    for (let y = first.y; y <= last.y; y++) {
+      const row = rows[y]!;
+      const left = Math.max(0, Math.min(row.length, y === first.y ? first.x : 0));
+      const right = Math.max(left, Math.min(row.length, y === last.y ? last.x + 1 : row.length));
+      lines.push(
+        row
+          .slice(left, right)
+          .map((cell) => cell.char)
+          .join("")
+          .replace(/\s+$/, ""),
+      );
+    }
+    return lines.join("\n");
+  }
+
   snapshot(mode: Snapshot["mode"] = "text"): Snapshot {
     const allRows = [...this.history, ...this.cells];
     const end = allRows.length - this.viewportOffset;
@@ -398,6 +476,8 @@ export class TerminalEmulator {
       },
       viewport: this.viewport,
       colorUsage,
+      selection: this.selection,
+      modes: Object.fromEntries(this.modes),
     };
     if (mode === "text") return { mode, ...base, text };
     if (mode === "raw")
@@ -441,4 +521,13 @@ export class TerminalEmulator {
         : [],
     }));
   }
+}
+
+/**
+ * Wraps `text` in bracketed-paste guard sequences when the application
+ * negotiated mode 2004. Pure function so the behavior is unit-testable
+ * without a PTY; the session delegates to it.
+ */
+export function wrapBracketedPaste(text: string, bracketed: boolean): string {
+  return bracketed ? `\x1b[200~${text}\x1b[201~` : text;
 }

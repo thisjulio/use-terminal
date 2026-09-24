@@ -89,13 +89,13 @@ This roadmap turns the vision in `PRODUCT.md` into verifiable increments. The lo
 
 **Goal:** bring emulator behavior closer to a real terminal and make compatibility measurable.
 
-- [ ] Define a compatibility matrix for VT/ANSI, OSC, CSI, DCS, and private modes.
-- [ ] Implement persistent scrollback, viewport, offset, and alternate screen.
-- [ ] Implement cell/multiline selection, auto-scroll while dragging, and clipboard.
-- [ ] Separate emulator-local scrolling from mouse reporting forwarded to the TUI.
-- [ ] Progressively support bracketed paste, focus events, hyperlinks, clipboard, and feature negotiation.
-- [ ] Add deterministic fixtures for each sequence and tests with real shells and TUIs.
-- [ ] Publish viewport, selection, scrollback, and active-mode snapshots without losing raw bytes.
+- [x] Define a compatibility matrix for VT/ANSI, OSC, CSI, DCS, and private modes.
+- [x] Implement persistent scrollback, viewport, offset, and alternate screen.
+- [x] Implement cell/multiline selection and auto-scroll while dragging.
+- [x] Separate emulator-local scrolling from mouse reporting forwarded to the TUI.
+- [x] Progressively support bracketed paste, focus events, hyperlinks, clipboard, and feature negotiation.
+- [x] Add deterministic fixtures for each sequence and tests with real shells and TUIs.
+- [x] Publish viewport, selection, scrollback, and active-mode snapshots without losing raw bytes.
 
 **Outcome:** the viewer and APIs can reproduce the main flows of a human terminal, with limitations documented per feature.
 
@@ -103,12 +103,13 @@ This roadmap turns the vision in `PRODUCT.md` into verifiable increments. The lo
 
 **Goal:** provide faithful control and ergonomic automation over the same core.
 
-- [ ] Define shared schemas for low-level and high-level operations.
-- [ ] Expose bytes, sequences, events, modes, viewport, and snapshots through the low-level API.
-- [ ] Expose `type`, keys, clicks, drag, scrolling, selection, clipboard, and waits through the high-level API.
-- [ ] Ensure parity of operations, errors, and validations between the package, REST, and MCP.
-- [ ] Create contract tests and automation examples for each adapter.
-- [ ] Keep access to the raw snapshot and raw events in every high-level operation.
+- [x] Define shared schemas for low-level and high-level operations.
+- [x] Expose bytes, sequences, events, modes, viewport, and snapshots through the low-level API.
+- [x] Expose `type`, keys, clicks, drag, scrolling, selection, clipboard, and waits through the high-level API.
+- [x] Expose `pressKey` (named keys: arrows, function keys, Home/End, PageUp/Down, ESC, Backspace, Insert/Delete) and `performAction` (deterministic semantic actions `type` and `press-key`) through the high-level API, package, REST (`/key` and `/action`), and MCP (`sessions_key` and `sessions_action`), with a shared key map as the single source of truth.
+- [x] Ensure parity of operations, errors, and validations between the package, REST, and MCP.
+- [x] Create contract tests and automation examples for each adapter.
+- [x] Keep access to the raw snapshot and raw events in every high-level operation.
 
 **Outcome:** an agent can choose terminal fidelity or semantic automation without changing its capability model.
 
@@ -121,7 +122,7 @@ This roadmap turns the vision in `PRODUCT.md` into verifiable increments. The lo
 - [ ] Design strong authentication and secure remote exposure.
 - [ ] Evaluate persistence/reconnection after restart.
 - [ ] Expand CI to macOS and Windows when the backend allows it.
-- [ ] Publish the npm package and provide `bunx`/diagnostic CLI support.
+- [x] Publish the npm package and provide `bunx`/diagnostic CLI support.
 - [ ] Add latency and capacity benchmarks.
 
 **Outcome:** a foundation for remote, multi-user, and production use without confusing it with the trusted-environment MVP.

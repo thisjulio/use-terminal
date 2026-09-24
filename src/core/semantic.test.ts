@@ -19,13 +19,17 @@ describe("Semantic Parser", () => {
     expect(errorNodes.length).toBeGreaterThan(0);
   });
 
-  test("suggests actions for prompts", () => {
+  test("suggests an executable action for prompts", () => {
     const emu = new TerminalEmulator(80, 24);
     emu.feed("user@host:~$ ");
     const snap = emu.snapshot("semantic");
     const actions = suggestActions(snap.tree!);
-    const promptActions = actions.filter((a) => a.id === "continue-at-prompt");
+    // A prompt suggests the executable `type` action from the
+    // performAction vocabulary, with an `input` field carrying the
+    // suggested text (empty when there is none).
+    const promptActions = actions.filter((a) => a.id === "type");
     expect(promptActions.length).toBeGreaterThan(0);
+    expect(promptActions[0]!.input).toBeDefined();
   });
 
   test("suggests actions for errors", () => {

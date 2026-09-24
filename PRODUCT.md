@@ -6,7 +6,7 @@
 
 The product is designed for coding agents working in local repositories. The core is a Bun/TypeScript package with equivalent adapters for local REST and MCP stdio. Its intended differentiation is bringing together a real PTY, VT/ANSI emulation, viewport, scrollback, selection, clipboard, mouse, and TUI automation under one contract. Every capability should exist through a low-level API faithful to bytes and events and through a high-level API oriented toward automation actions.
 
-> Status: initial post-discovery specification. Capabilities marked as MVP are product targets, not claims that they are already implemented.
+> Status: the MVP core (sessions, emulator, snapshots, REST/MCP adapters, mouse, and clipboard) is implemented and tested. Remaining capabilities—full VT/ANSI compatibility matrix, cell/multiline selection, and the explicit low-level/high-level API separation—are product targets, not claims that they are already implemented.
 
 ## Problem
 

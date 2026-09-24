@@ -193,8 +193,53 @@ export const COMPONENT_SCHEMAS: Record<string, JsonSchema> = {
   },
   KeyName: {
     type: "string",
-    enum: ["ENTER", "TAB", "CTRL_C", "CTRL_D", "CTRL_Z"],
-    description: "Special keys supported by the high-level API",
+    enum: [
+      "ENTER",
+      "TAB",
+      "CTRL_C",
+      "CTRL_D",
+      "CTRL_Z",
+      "ESC",
+      "BACKSPACE",
+      "ARROW_UP",
+      "ARROW_DOWN",
+      "ARROW_RIGHT",
+      "ARROW_LEFT",
+      "HOME",
+      "END",
+      "INSERT",
+      "DELETE",
+      "PAGE_UP",
+      "PAGE_DOWN",
+      "F1",
+      "F2",
+      "F3",
+      "F4",
+      "F5",
+      "F6",
+      "F7",
+      "F8",
+      "F9",
+      "F10",
+      "F11",
+      "F12",
+    ],
+    description:
+      "Keys supported by the high-level API: control keys (ENTER, TAB, CTRL_C, CTRL_D, CTRL_Z) and named keys (arrows, function keys, Home/End, PageUp/Down, ESC, Backspace, Insert/Delete)",
+  },
+  SelectionPoint: {
+    type: "object",
+    description: "A point in absolute screen coordinates (0 = top of scrollback).",
+    properties: { x: { type: "integer", minimum: 0 }, y: { type: "integer", minimum: 0 } },
+    required: ["x", "y"],
+  },
+  Selection: {
+    type: "object",
+    properties: {
+      start: { $ref: "#/components/schemas/SelectionPoint" },
+      end: { $ref: "#/components/schemas/SelectionPoint" },
+    },
+    required: ["start", "end"],
   },
   Error: ERROR_SCHEMA,
 };
@@ -373,14 +418,16 @@ export const ROUTES: RestRoute[] = [
     id: "session_key",
     path: "/sessions/{id}/key",
     method: "POST",
-    summary: "Send a special key (high-level)",
-    description: "Sends mapped special keys (ENTER, TAB, CTRL_C, CTRL_D, CTRL_Z).",
+    summary: "Send a key (high-level)",
+    description:
+      "Sends a mapped key (control keys ENTER, TAB, CTRL_C, CTRL_D, CTRL_Z, and named keys: arrows, function keys, Home/End, PageUp/Down, ESC, Backspace, Insert/Delete).",
     tags: ["sessions"],
     pathParams: [{ name: "id", description: "Session ID" }],
     requestBody: { type: "object", properties: { key: { $ref: "#/components/schemas/KeyName" } }, required: ["key"] },
     mcpTool: {
       name: "sessions_key",
-      description: "Sends a mapped special key (ENTER, TAB, CTRL_C, CTRL_D, CTRL_Z).",
+      description:
+        "Sends a mapped key (control keys ENTER, TAB, CTRL_C, CTRL_D, CTRL_Z, and named keys: arrows, function keys, Home/End, PageUp/Down, ESC, Backspace, Insert/Delete).",
       inputSchema: {
         type: "object",
         properties: { sessionId: { type: "string" }, key: { $ref: "#/components/schemas/KeyName" } },
@@ -424,6 +471,52 @@ export const ROUTES: RestRoute[] = [
     responses: [
       { status: 200, description: "OK", schema: OK_SCHEMA },
       { status: 400, description: "text is missing", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 404, description: "Session not found", schema: { $ref: "#/components/schemas/Error" } },
+    ],
+  },
+  {
+    id: "session_action",
+    path: "/sessions/{id}/action",
+    method: "POST",
+    summary: "Execute a semantic action (high-level)",
+    description:
+      "Executes a deterministic semantic action by id with explicit parameters. Supported ids: press-key (params: key) and type (params: text, submit).",
+    tags: ["sessions"],
+    pathParams: [{ name: "id", description: "Session ID" }],
+    requestBody: {
+      type: "object",
+      properties: {
+        id: { type: "string", enum: ["press-key", "type"], description: "Action id" },
+        key: { type: "string", description: "Required for press-key" },
+        text: { type: "string", description: "Required for type" },
+        submit: { type: "boolean", description: "For type: sends Enter after the text (default: false)" },
+      },
+      required: ["id"],
+    },
+    mcpTool: {
+      name: "sessions_action",
+      description:
+        "Executes a deterministic semantic action by id with explicit parameters. Supported ids: press-key (params: key) and type (params: text, submit).",
+      inputSchema: {
+        type: "object",
+        properties: {
+          sessionId: { type: "string" },
+          id: { type: "string", enum: ["press-key", "type"] },
+          key: { type: "string" },
+          text: { type: "string" },
+          submit: { type: "boolean" },
+        },
+        required: ["sessionId", "id"],
+        additionalProperties: false,
+      },
+    },
+    responses: [
+      { status: 200, description: "OK", schema: OK_SCHEMA },
+      {
+        status: 400,
+        description: "Unknown action id or missing parameters",
+        schema: { $ref: "#/components/schemas/Error" },
+      },
       { status: 404, description: "Session not found", schema: { $ref: "#/components/schemas/Error" } },
     ],
   },
@@ -562,6 +655,35 @@ export const ROUTES: RestRoute[] = [
         schema: { type: "object", properties: { ok: { type: "boolean" }, text: { type: "string" } }, required: ["ok"] },
       },
       { status: 504, description: "Timeout waiting for text", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 404, description: "Session not found", schema: { $ref: "#/components/schemas/Error" } },
+    ],
+  },
+  {
+    id: "session_wait_change",
+    path: "/sessions/{id}/wait/change",
+    method: "POST",
+    summary: "Wait for any screen change (high-level)",
+    description: "Waits until the visible screen changes after the call or the timeout expires.",
+    tags: ["sessions"],
+    pathParams: [{ name: "id", description: "Session ID" }],
+    requestBody: {
+      type: "object",
+      properties: { timeoutMs: { type: "integer", description: "Default: 10000" } },
+    },
+    mcpTool: {
+      name: "sessions_wait_change",
+      description:
+        "Waits, with a timeout, for the screen to change. Useful for TUIs and prompts without a known text string.",
+      inputSchema: {
+        type: "object",
+        properties: { sessionId: { type: "string" }, timeoutMs: { type: "integer" } },
+        required: ["sessionId"],
+        additionalProperties: false,
+      },
+    },
+    responses: [
+      { status: 200, description: "Screen changed", schema: OK_SCHEMA },
+      { status: 504, description: "Timeout waiting for screen change", schema: { $ref: "#/components/schemas/Error" } },
       { status: 404, description: "Session not found", schema: { $ref: "#/components/schemas/Error" } },
     ],
   },
@@ -718,6 +840,144 @@ export const ROUTES: RestRoute[] = [
       },
       { status: 404, description: "Session not found", schema: { $ref: "#/components/schemas/Error" } },
     ],
+  },
+  {
+    id: "session_select",
+    path: "/sessions/{id}/select",
+    method: "POST",
+    summary: "Select a screen region (high-level)",
+    description: "Selects a region using absolute row coordinates (0 = top of scrollback). Returns the Selection.",
+    tags: ["sessions"],
+    pathParams: [{ name: "id", description: "Session ID" }],
+    requestBody: {
+      type: "object",
+      properties: {
+        from: { $ref: "#/components/schemas/SelectionPoint" },
+        to: { $ref: "#/components/schemas/SelectionPoint" },
+      },
+      required: ["from", "to"],
+    },
+    mcpTool: {
+      name: "sessions_select",
+      description:
+        "Selects a screen region (high-level). from/to use absolute row coordinates (0 = top of scrollback). Returns the Selection.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          sessionId: { type: "string" },
+          from: { $ref: "#/components/schemas/SelectionPoint" },
+          to: { $ref: "#/components/schemas/SelectionPoint" },
+        },
+        required: ["sessionId", "from", "to"],
+        additionalProperties: false,
+      },
+    },
+    responses: [
+      { status: 200, description: "Selection", schema: { $ref: "#/components/schemas/Selection" } },
+      { status: 400, description: "Invalid parameters", schema: { $ref: "#/components/schemas/Error" } },
+      { status: 404, description: "Session not found", schema: { $ref: "#/components/schemas/Error" } },
+    ],
+  },
+  {
+    id: "session_clear_selection",
+    path: "/sessions/{id}/selection/clear",
+    method: "POST",
+    summary: "Clear the current selection",
+    description: "Removes the current screen selection.",
+    tags: ["sessions"],
+    pathParams: [{ name: "id", description: "Session ID" }],
+    mcpTool: {
+      name: "sessions_clear_selection",
+      description: "Clears the current screen selection.",
+      inputSchema: {
+        type: "object",
+        properties: { sessionId: { type: "string" } },
+        required: ["sessionId"],
+        additionalProperties: false,
+      },
+    },
+    responses: [{ status: 200, description: "OK", schema: OK_SCHEMA }],
+  },
+  {
+    id: "session_selection_text",
+    path: "/sessions/{id}/selection",
+    method: "GET",
+    summary: "Get the selected text (high-level)",
+    description: "Returns the text spanning the current selection (empty when there is none).",
+    tags: ["sessions"],
+    pathParams: [{ name: "id", description: "Session ID" }],
+    mcpTool: {
+      name: "sessions_selection_text",
+      description: "Returns the text of the current selection (empty when there is none).",
+      inputSchema: {
+        type: "object",
+        properties: { sessionId: { type: "string" } },
+        required: ["sessionId"],
+        additionalProperties: false,
+      },
+    },
+    responses: [
+      {
+        status: 200,
+        description: "Selected text",
+        schema: { type: "object", properties: { text: { type: "string" } }, required: ["text"] },
+      },
+      { status: 404, description: "Session not found", schema: { $ref: "#/components/schemas/Error" } },
+    ],
+  },
+  {
+    id: "session_selection_copy",
+    path: "/sessions/{id}/selection/copy",
+    method: "POST",
+    summary: "Copy the selection to the host clipboard",
+    description:
+      "Copies the current selection to the host clipboard (requires xclip/xsel/wl-copy). Returns copied=false when there is no selection or no tool is available.",
+    tags: ["sessions"],
+    pathParams: [{ name: "id", description: "Session ID" }],
+    mcpTool: {
+      name: "sessions_selection_copy",
+      description:
+        "Copies the current selection to the host clipboard (requires xclip/xsel/wl-copy). Returns copied=false when there is no selection or no tool.",
+      inputSchema: {
+        type: "object",
+        properties: { sessionId: { type: "string" } },
+        required: ["sessionId"],
+        additionalProperties: false,
+      },
+    },
+    responses: [
+      {
+        status: 200,
+        description: "Result",
+        schema: {
+          type: "object",
+          properties: { ok: { type: "boolean" }, copied: { type: "boolean" } },
+          required: ["ok", "copied"],
+        },
+      },
+      { status: 404, description: "Session not found", schema: { $ref: "#/components/schemas/Error" } },
+    ],
+  },
+  {
+    id: "session_selection_paste",
+    path: "/sessions/{id}/selection/paste",
+    method: "POST",
+    summary: "Paste the selection into the PTY",
+    description:
+      "Writes the current selection into the PTY. When the application negotiated bracketed paste, the text is wrapped in guard sequences.",
+    tags: ["sessions"],
+    pathParams: [{ name: "id", description: "Session ID" }],
+    mcpTool: {
+      name: "sessions_selection_paste",
+      description: "Writes the current selection into the PTY (respecting bracketed paste when negotiated).",
+      inputSchema: {
+        type: "object",
+        properties: { sessionId: { type: "string" } },
+        required: ["sessionId"],
+        additionalProperties: false,
+      },
+    },
+    responses: [{ status: 200, description: "OK", schema: OK_SCHEMA }],
   },
   {
     id: "session_stream",

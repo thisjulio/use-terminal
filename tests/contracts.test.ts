@@ -302,6 +302,178 @@ describe("MCP/REST/OpenAPI contracts", () => {
     server.stop();
   }, 30000);
 
+  test("REST/MCP parity: wait/change resolves on change and times out idle", async () => {
+    const manager = new TerminalManager();
+    const session = await manager.create({ shell: "/bin/sh", cols: 40, rows: 10 });
+    const server = createRestServer(manager, 0);
+    const base = `http://${server.hostname}:${server.port}`;
+    const id = session.id;
+
+    await session.waitForText("$", 5000);
+
+    // A real change: type a command, then the REST wait/change must resolve.
+    await session.type("printf 'wait-change-ok\\n'", true);
+    const changed = await fetch(`${base}/sessions/${id}/wait/change`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ timeoutMs: 5000 }),
+    });
+    expect(changed.status).toBe(200);
+    expect(await changed.json()).toEqual({ ok: true });
+
+    // Idle: nothing changes, so the REST wait/change must time out with 504.
+    const idle = await fetch(`${base}/sessions/${id}/wait/change`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ timeoutMs: 100 }),
+    });
+    expect(idle.status).toBe(504);
+    expect(((await idle.json()) as { error: string }).error).toContain("Timed out");
+
+    // MCP parity: the same operation is callable through the MCP adapter and
+    // surfaces the idle timeout as a tool error (isError).
+    const mcp = await handleMcpMessage(
+      {
+        jsonrpc: "2.0",
+        id: 7,
+        method: "tools/call",
+        params: { name: "sessions_wait_change", arguments: { sessionId: id, timeoutMs: 100 } },
+      },
+      manager,
+    );
+    expect(mcp).not.toBeNull();
+    const mcpResult = mcp as { result?: { content: { text: string }[]; isError?: boolean } };
+    expect(mcpResult.result!.isError).toBe(true);
+    expect(mcpResult.result!.content[0]!.text).toContain("Timed out");
+    session.close();
+    server.stop();
+  }, 30000);
+
+  test("REST/MCP parity: /key named keys and /action", async () => {
+    const manager = new TerminalManager();
+    const session = await manager.create({ shell: "/bin/sh", cols: 40, rows: 10 });
+    const server = createRestServer(manager, 0);
+    const base = `http://${server.hostname}:${server.port}`;
+    const id = session.id;
+    await session.waitForText("$", 5000);
+
+    // REST: named key via the unified /key route is accepted.
+    const namedKey = await fetch(`${base}/sessions/${id}/key`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: "ARROW_UP" }),
+    });
+    expect(namedKey.status).toBe(200);
+    expect(await namedKey.json()).toEqual({ ok: true });
+
+    // REST: /action executes the `type` action.
+    const action = await fetch(`${base}/sessions/${id}/action`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: "type", text: "printf 'action-parity\\n'" }),
+    });
+    expect(action.status).toBe(200);
+    expect(await action.json()).toEqual({ ok: true });
+
+    // REST: /action rejects an unknown id with a stable 400.
+    const badAction = await fetch(`${base}/sessions/${id}/action`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: "nada" }),
+    });
+    expect(badAction.status).toBe(400);
+    const badBody = (await badAction.json()) as { error: string };
+    expect(badBody.error).toContain("unsupported action");
+
+    // MCP: sessions_key accepts a named key (same bytes as REST).
+    const mcpKey = await handleMcpMessage(
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: { name: "sessions_key", arguments: { sessionId: id, key: "ARROW_UP" } },
+      },
+      manager,
+    );
+    const mcpKeyResult = mcpKey as { result?: { content: { text: string }[]; isError?: boolean } };
+    expect(mcpKeyResult.result!.isError).toBeFalsy();
+    expect(JSON.parse(mcpKeyResult.result!.content[0]!.text)).toEqual({ ok: true });
+
+    // MCP: sessions_action executes the `type` action (same as REST).
+    const mcpAction = await handleMcpMessage(
+      {
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: {
+          name: "sessions_action",
+          arguments: { sessionId: id, id: "type", text: "printf 'mcp-action-parity\\n'" },
+        },
+      },
+      manager,
+    );
+    const mcpActionResult = mcpAction as { result?: { content: { text: string }[]; isError?: boolean } };
+    expect(mcpActionResult.result!.isError).toBeFalsy();
+    expect(JSON.parse(mcpActionResult.result!.content[0]!.text)).toEqual({ ok: true });
+
+    session.close();
+    server.stop();
+  }, 30000);
+
+  test("REST selection parity: select, text, clear", async () => {
+    const manager = new TerminalManager();
+    const session = await manager.create({ shell: "/bin/sh", cols: 40, rows: 10 });
+    const server = createRestServer(manager, 0);
+    const base = `http://${server.hostname}:${server.port}`;
+    const id = session.id;
+
+    await session.type("printf 'select-parity\n'", true);
+    await session.waitForText("select-parity", 5000);
+
+    // Locate the absolute row of the output so the selection is deterministic
+    // regardless of how much prompt scrollback exists. Absolute row 0 is the
+    // oldest (top of scrollback); the visible rows are the last `rows` rows.
+    const raw = session.snapshot("raw");
+    const visibleOffset = (raw.viewport?.totalRows ?? 0) - raw.rows;
+    // Match the output line exactly (trimmed), not the typed command line that
+    // also contains the substring.
+    const visibleRow = (raw.cells ?? []).findIndex(
+      (line) =>
+        line
+          .map((cell) => cell.char)
+          .join("")
+          .trim() === "select-parity",
+    );
+    expect(visibleRow).toBeGreaterThanOrEqual(0);
+    const absRow = visibleOffset + visibleRow;
+
+    const select = await fetch(`${base}/sessions/${id}/select`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ from: { x: 0, y: absRow }, to: { x: 13, y: absRow } }),
+    });
+    expect(select.status).toBe(200);
+    const selection = (await select.json()) as { start: { x: number; y: number }; end: { x: number; y: number } };
+    expect(selection.start).toMatchObject({ x: 0, y: absRow });
+    expect(selection.end).toMatchObject({ x: 13, y: absRow });
+
+    const text = await fetch(`${base}/sessions/${id}/selection`);
+    expect(text.status).toBe(200);
+    const textBody = (await text.json()) as { text: string };
+    expect(textBody.text).toContain("select-parity");
+
+    const clear = await fetch(`${base}/sessions/${id}/selection/clear`, { method: "POST" });
+    expect(clear.status).toBe(200);
+    expect(await clear.json()).toEqual({ ok: true });
+
+    const textAfter = await fetch(`${base}/sessions/${id}/selection`);
+    const textAfterBody = (await textAfter.json()) as { text: string };
+    expect(textAfterBody.text).toBe("");
+
+    session.close();
+    server.stop();
+  }, 30000);
+
   test("OpenAPI document matches the route table", () => {
     const doc = buildOpenApiDocument("/") as { paths: Record<string, Record<string, unknown>> };
     for (const route of ROUTES) {

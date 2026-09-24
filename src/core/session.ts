@@ -2,6 +2,8 @@ import { execSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { spawn as spawnPty } from "bun-pty";
 import type {
+  Selection,
+  SelectionPoint,
   SessionInfo,
   SessionOptions,
   SignalName,
@@ -9,7 +11,8 @@ import type {
   TerminalEvent,
   MouseEvent as TerminalMouseEvent,
 } from "../types";
-import { TerminalEmulator } from "./emulator";
+import { TerminalEmulator, wrapBracketedPaste } from "./emulator";
+import { namedKeySequence } from "./keys";
 import { renderScreenshot, type ScreenshotFormat, type ScreenshotOptions } from "./screenshot";
 
 const keySequences = { CTRL_C: "\x03", CTRL_D: "\x04", CTRL_Z: "\x1a", ENTER: "\r", TAB: "\t" } as const;
@@ -28,6 +31,11 @@ export class TerminalSession {
   }> = [];
   private screenWaiters: Array<{
     text: string;
+    resolve: () => void;
+    reject: (error: Error) => void;
+    timer: ReturnType<typeof setTimeout>;
+  }> = [];
+  private screenChangeWaiters: Array<{
     resolve: () => void;
     reject: (error: Error) => void;
     timer: ReturnType<typeof setTimeout>;
@@ -87,12 +95,18 @@ export class TerminalSession {
         clearTimeout(waiter.timer);
         waiter.resolve();
       }
+      for (const waiter of [...this.screenChangeWaiters]) {
+        clearTimeout(waiter.timer);
+        waiter.resolve();
+      }
+      this.screenChangeWaiters = [];
     });
     this.proc.onExit(({ exitCode }) => {
       this.status = "exited";
       this.exitCode = exitCode;
       this.emit({ type: "exit", exitCode });
       this.rejectScreenWaiters("Session exited before text appeared");
+      this.rejectScreenChangeWaiters("Session exited");
       this.rejectEventWaiters("Session exited");
     });
   }
@@ -155,6 +169,50 @@ export class TerminalSession {
   }
   async sendKey(key: Key): Promise<void> {
     await this.write(keySequences[key]);
+  }
+
+  /**
+   * Sends a mapped key by name, dispatching to the control-key map
+   * (`sendKey`) or the named-key map (`pressKey`). Used by the REST and MCP
+   * adapters so a single unified key name reaches the same bytes everywhere.
+   */
+  async sendMappedKey(name: string): Promise<void> {
+    const control = keySequences[name as Key];
+    if (control !== undefined) {
+      await this.write(control);
+      return;
+    }
+    await this.pressKey(name);
+  }
+
+  /**
+   * Sends a named key (arrows, function keys, Home/End, PageUp/Down, ESC,
+   * Insert/Delete) by writing its VT/ANSI escape sequence. Named keys are
+   * distinct from `sendKey`'s control keys, which map to pure control bytes.
+   * Throws when the key name is not recognized.
+   */
+  async pressKey(name: string): Promise<void> {
+    const sequence = namedKeySequence(name);
+    if (sequence === null) throw new Error(`unknown key: ${name}`);
+    await this.write(sequence);
+  }
+
+  /**
+   * Executes a high-level semantic action by id with explicit parameters.
+   * Only the deterministic `press-key` and `type` actions are supported; they
+   * map directly to bytes and require no snapshot resolution.
+   */
+  async performAction(id: string, params: { key?: string; text?: string; submit?: boolean } = {}): Promise<void> {
+    switch (id) {
+      case "press-key":
+        if (typeof params.key !== "string") throw new Error("press-key requires `key`");
+        return this.pressKey(params.key);
+      case "type":
+        if (typeof params.text !== "string") throw new Error("type requires `text`");
+        return this.type(params.text, Boolean(params.submit));
+      default:
+        throw new Error(`unsupported action: ${id}`);
+    }
   }
   signal(signal: SignalName): void {
     this.proc?.kill(signal);
@@ -266,15 +324,55 @@ export class TerminalSession {
       const result = await proc.exited;
       if (result === 0) {
         const output = await new Response(proc.stdout).text();
-        if (output) await this.write(output);
+        if (output) await this.paste(output);
       }
     } catch {
       // Clipboard not available
     }
   }
 
+  /**
+   * Writes text to the PTY. When the application negotiated bracketed paste
+   * (private mode 2004), the text is wrapped in the \x1b[200~ ... \x1b[201~ guard
+   * so multi-line content is pasted as data, not interpreted as commands.
+   */
   async paste(text: string): Promise<void> {
-    await this.write(text);
+    await this.write(wrapBracketedPaste(text, this.emulator.isModeEnabled("2004")));
+  }
+
+  /**
+   * Selects the screen region from `from` to `to` using absolute row
+   * coordinates (0 = top of scrollback). The selection is stored in the
+   * emulator and surfaced in raw/semantic snapshots.
+   */
+  select(from: SelectionPoint, to: SelectionPoint): Selection {
+    return this.emulator.select(from, to);
+  }
+
+  clearSelection(): void {
+    this.emulator.clearSelection();
+  }
+
+  /** Returns the text spanning the current selection (may be empty). */
+  selectedText(): string {
+    return this.emulator.selectedText();
+  }
+
+  /**
+   * Copies the current selection to the host clipboard. Returns false when no
+   * clipboard tool is available or there is no selection.
+   */
+  async copySelectionToClipboard(): Promise<boolean> {
+    const text = this.selectedText();
+    if (!text) return false;
+    return this.copyToClipboard(text);
+  }
+
+  /** Pastes the current selection into the PTY (respecting bracketed paste). */
+  async pasteSelection(): Promise<void> {
+    const text = this.selectedText();
+    if (!text) return;
+    await this.paste(text);
   }
 
   async waitForText(text: string, timeout = 10000): Promise<void> {
@@ -304,6 +402,36 @@ export class TerminalSession {
         Math.max(0, timeout),
       );
       this.screenWaiters.push(waiter);
+    });
+  }
+
+  /**
+   * Resolves as soon as the visible screen changes (any emulator change after
+   * this call). Useful for waiting on TUIs and prompts that do not produce a
+   * known text string. Rejects on timeout or when the session is no longer
+   * running.
+   */
+  async waitForScreenChange(timeout = 10000): Promise<void> {
+    if (this.status !== "running") throw new Error("Session is not running");
+    await new Promise<void>((resolve, reject) => {
+      const waiter = {
+        resolve: () => resolve(),
+        reject: (error: Error) => {
+          const index = this.screenChangeWaiters.indexOf(waiter);
+          if (index >= 0) this.screenChangeWaiters.splice(index, 1);
+          reject(error);
+        },
+        timer: undefined as unknown as ReturnType<typeof setTimeout>,
+      };
+      waiter.timer = setTimeout(
+        () => {
+          const index = this.screenChangeWaiters.indexOf(waiter);
+          if (index >= 0) this.screenChangeWaiters.splice(index, 1);
+          reject(new Error(`Timed out waiting for screen change`));
+        },
+        Math.max(0, timeout),
+      );
+      this.screenChangeWaiters.push(waiter);
     });
   }
 
@@ -366,6 +494,12 @@ export class TerminalSession {
       waiter.reject(new Error(`${message}: ${waiter.text}`));
     }
   }
+  private rejectScreenChangeWaiters(message: string): void {
+    for (const waiter of this.screenChangeWaiters.splice(0)) {
+      clearTimeout(waiter.timer);
+      waiter.reject(new Error(message));
+    }
+  }
   private rejectEventWaiters(message: string): void {
     for (const waiter of this.waiters.splice(0)) waiter.reject(new Error(message));
   }
@@ -374,6 +508,7 @@ export class TerminalSession {
       this.proc?.kill("SIGTERM");
       this.status = "closed";
       this.rejectScreenWaiters("Session closed before text appeared");
+      this.rejectScreenChangeWaiters("Session closed");
       this.rejectEventWaiters("Session closed");
     }
   }

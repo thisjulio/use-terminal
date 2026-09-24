@@ -27,6 +27,12 @@ export type Cell = {
   dim?: boolean;
   italic?: boolean;
   strike?: boolean;
+  hyperlink?: string;
+};
+export type SelectionPoint = { x: number; y: number };
+export type Selection = {
+  start: SelectionPoint;
+  end: SelectionPoint;
 };
 export type SemanticRole =
   | "terminal"
@@ -73,6 +79,8 @@ export type Snapshot = {
   viewport?: { offset: number; height: number; totalRows: number };
   scrollback?: Cell[][];
   cursor: { x: number; y: number; visible: boolean };
+  selection?: Selection;
+  modes?: Record<string, boolean>;
   text?: string;
   cells?: Cell[][];
   tree?: SemanticNode;
