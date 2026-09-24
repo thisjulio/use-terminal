@@ -431,10 +431,11 @@ describe("MCP/REST/OpenAPI contracts", () => {
     // written before the shell is ready to read, which is racy on slower CI.
     await session.waitForText("$", 5000);
 
-    await session.type("printf 'select-parity\n'", true);
-    // Poll the raw snapshot until the exact output line appears. waitForText is
-    // not sufficient here because the command echo also contains the substring
-    // "select-parity"; we need to wait for the *output* line to render.
+    // Use echo with a unique token: the output line is a standalone exact
+    // match that cannot collide with the command echo. Poll the raw snapshot
+    // until that exact line renders.
+    const token = "select-parity-xyz";
+    await session.type(`echo '${token}'`, true);
     const deadline = Date.now() + 5000;
     let visibleRow = -1;
     let raw = session.snapshot("raw");
@@ -444,7 +445,7 @@ describe("MCP/REST/OpenAPI contracts", () => {
           line
             .map((cell) => cell.char)
             .join("")
-            .trim() === "select-parity",
+            .trim() === token,
       );
       if (visibleRow >= 0) break;
       await new Promise((r) => setTimeout(r, 25));
@@ -459,17 +460,17 @@ describe("MCP/REST/OpenAPI contracts", () => {
     const select = await fetch(`${base}/sessions/${id}/select`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ from: { x: 0, y: absRow }, to: { x: 13, y: absRow } }),
+      body: JSON.stringify({ from: { x: 0, y: absRow }, to: { x: token.length, y: absRow } }),
     });
     expect(select.status).toBe(200);
     const selection = (await select.json()) as { start: { x: number; y: number }; end: { x: number; y: number } };
     expect(selection.start).toMatchObject({ x: 0, y: absRow });
-    expect(selection.end).toMatchObject({ x: 13, y: absRow });
+    expect(selection.end).toMatchObject({ x: token.length, y: absRow });
 
     const text = await fetch(`${base}/sessions/${id}/selection`);
     expect(text.status).toBe(200);
     const textBody = (await text.json()) as { text: string };
-    expect(textBody.text).toContain("select-parity");
+    expect(textBody.text).toContain(token);
 
     const clear = await fetch(`${base}/sessions/${id}/selection/clear`, { method: "POST" });
     expect(clear.status).toBe(200);
